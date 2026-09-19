@@ -170,6 +170,19 @@ resource "oci_core_instance" "core" {
     memory_in_gbs = 12
   }
 
+  # Chiffrement du trafic entre l'instance et ses volumes paravirtualisés, dont
+  # celui d'amorçage. Gratuit sur A1 (déchargé au matériel), et sans effet de
+  # bord : les deux volumes sont déjà paravirtualisés. CKV_OCI_4.
+  is_pv_encryption_in_transit_enabled = true
+
+  # Coupe l'endpoint IMDSv1, qui répond sans jeton à quiconque sait faire un GET
+  # sur 169.254.169.254 — donc à toute SSRF depuis un service de l'hôte. IMDSv2
+  # exige un jeton PUT préalable. Rien ici ne lit IMDS : cloud-init utilise v2
+  # depuis longtemps, et le `user_data` est de toute façon lu avant. CKV_OCI_5.
+  instance_options {
+    are_legacy_imds_endpoints_disabled = true
+  }
+
   source_details {
     source_type = "image"
     source_id   = var.arm_image_id

@@ -29,12 +29,16 @@ skip-check:
   # avec versioning.
   - CKV_OCI_7
 
-  # --- À CORRIGER, pas à exempter définitivement -------------------------
-  # Ces deux-là sont du durcissement gratuit sur `oci_core_instance.core`
-  # (`is_pv_encryption_in_transit_enabled`, `are_legacy_imds_endpoints_disabled`).
-  # Elles ne sont pas prises au passage parce que la boucle d'attente de
-  # capacité lance `tofu apply` toute seule : une erreur dans le bloc instance
-  # ne se verrait qu'au moment où la capacité ARM se libère, et coûterait la
-  # fenêtre. À faire délibérément, avec un `tofu plan` sous les yeux.
-  - CKV_OCI_4   # chiffrement en transit du volume d'amorçage
-  - CKV_OCI_5   # endpoint IMDS hérité encore actif
+
+  # --- Refusée : la règle vise un champ déprécié -------------------------
+  # CKV_OCI_4 inspecte `launch_options[0].is_pv_encryption_in_transit_enabled`
+  # (vérifié en lisant la règle dans l'image checkov). Or la doc du provider dit
+  # ce champ-là déprécié, « replaced by the equivalent setting in
+  # LaunchInstanceDetails » — c'est-à-dire l'attribut de premier niveau
+  # `is_pv_encryption_in_transit_enabled`, qui EST posé à true sur
+  # `oci_core_instance.core`. Le durcissement est donc bien appliqué ; c'est la
+  # règle qui regarde l'ancien chemin. Ne pas ajouter un bloc `launch_options`
+  # juste pour la satisfaire : il écrirait un champ déprécié et exposerait
+  # `network_type`/`firmware`/`boot_volume_type`, tous ForceNew, que l'API
+  # remplit très bien elle-même.
+  - CKV_OCI_4
