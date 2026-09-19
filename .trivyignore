@@ -1,0 +1,22 @@
+# CVE dont le correctif n'est pas entre nos mains.
+#
+# Chaque entrée porte une date d'expiration : passé cette date Trivy cesse de
+# l'ignorer et le CI redevient rouge. C'est voulu — une exemption sans échéance
+# est une exemption définitive que personne ne relit jamais.
+
+# netty embarqué dans `server.jar`, c'est-à-dire dans le serveur Minecraft tel
+# que Mojang le publie. On ne recompile pas le serveur : le seul correctif amont
+# serait une version de Minecraft dont le netty est à jour, ce qui est une
+# décision de jeu (les mods doivent suivre, le monde se met à niveau sans
+# retour) et pas un correctif de CI. À rouvrir en même temps que `MC_VERSION`
+# dans containers/minecraft/Containerfile.
+#
+# Exposition réelle : `mc.network` est Internal=true, le serveur ne publie aucun
+# port sur l'hôte et n'est joignable que par Gate, derrière la liste blanche.
+# Il n'y a pas de trafic HTTP ni TLS arbitraire qui entre — ce qui ne rend pas
+# ces CVE inoffensives, seulement difficiles à atteindre depuis l'extérieur.
+CVE-2026-59901 exp:2026-12-31
+CVE-2026-55831 exp:2026-12-31
+CVE-2026-55833 exp:2026-12-31
+CVE-2026-56745 exp:2026-12-31
+CVE-2026-75595 exp:2026-12-31

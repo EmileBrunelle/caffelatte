@@ -10,8 +10,12 @@ jobs:
       - run: pipx install ansible-lint && ansible-lint ansible/
       - name: Aucun secret en clair, aucune adresse d'hôte
         run: |
+          # 127.0.0.1 et 0.0.0.0 ne désignent aucun hôte : les exclure, sinon le
+          # garde-fou se déclenche sur la doc de `ansible-pull` (inventory-pull.yml).
           ! grep -rEn '([0-9]{1,3}\.){3}[0-9]{1,3}' ansible/ --include='*.yml' \
-            --exclude='*.example.yml' || { echo "adresse IP dans le dépôt public"; exit 1; }
+              --exclude='*.example.yml' \
+            | grep -vE '\b(127\.0\.0\.1|0\.0\.0\.0)\b' \
+            || { echo "adresse IP dans le dépôt public"; exit 1; }
 
   image:
     runs-on: ubuntu-24.04-arm

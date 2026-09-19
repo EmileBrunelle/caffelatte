@@ -26,7 +26,7 @@ RUN mkdir -p mods && for slug in ${MODS}; do \
     done
 
 # rcon-cli : c'est lui qui porte les avertissements en jeu avant un redémarrage.
-ARG RCON_CLI=1.7.0
+ARG RCON_CLI=1.7.7
 # UBI n'a pas dpkg : on mappe uname -m vers les noms d'archive Go (amd64/arm64).
 RUN case "$(uname -m)" in \
       x86_64) arch=amd64 ;; \
