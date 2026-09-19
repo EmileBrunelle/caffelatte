@@ -3,8 +3,12 @@ ansible/inventory.yml
 # Clé privée age : jamais commitée (la publique va dans .sops.yaml).
 *.agekey
 keys.txt
+# Clé Floodgate (AES) : partagée via podman secret, jamais dans le dépôt.
+floodgate.pem
 *.retry
 *.tfvars
 .terraform/
 *.tfstate*
 HANDOFF.md
+# Cache local d'ansible-lint / ansible-galaxy.
+.ansible/

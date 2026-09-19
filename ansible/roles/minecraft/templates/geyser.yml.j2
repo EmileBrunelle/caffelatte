@@ -1,0 +1,17 @@
+# Geyser standalone : traduit Bedrock vers le port dédié de Gate
+# (bedrock.geyserListenAddr dans gate.yml.j2), pas vers le port Java 25565.
+# Champs vérifiés sur GeyserMC/Geyser (core/src/test/resources/configuration/tests/all-changed.yml).
+remote:
+  address: gate
+  port: {{ geyser_listen_port | default(25567) }}
+  auth-type: floodgate
+  use-proxy-protocol: true
+
+# Même clé que bedrock.floodgateKeyPath côté Gate (podman secret floodgate_key).
+floodgate-key-file: /run/secrets/floodgate_key
+
+bedrock:
+  address: 0.0.0.0
+  port: 19132
+
+config-version: 4

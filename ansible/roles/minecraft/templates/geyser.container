@@ -8,6 +8,10 @@ ContainerName=geyser
 Network=mc.network
 PublishPort=19132:19132/udp
 Volume=%h/.config/geyser:/opt/geyser/config:Z
+Secret=floodgate_key
+# geyser.jar lit ./config.yml par défaut (WORKDIR=/opt/geyser), pas
+# ./config/config.yml : sans --config, le volume ci-dessus ne serait jamais lu.
+Exec=--config /opt/geyser/config/config.yml
 AutoUpdate=registry
 NoNewPrivileges=true
 

@@ -1,10 +1,12 @@
-- hosts: arm
+- name: Hôte ARM — socle durci et pile de jeu
+  hosts: arm
   become: true
   roles:
     - base
     - minecraft
 
-- hosts: edge
+- name: Hôte edge — socle durci
+  hosts: edge
   become: true
   roles:
     - base

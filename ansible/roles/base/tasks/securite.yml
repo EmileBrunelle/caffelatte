@@ -11,7 +11,7 @@
       KbdInteractiveAuthentication no
       PermitRootLogin no
       AllowUsers {{ ansible_user }}
-  notify: restart sshd
+  notify: Restart sshd
 
 - name: Pare-feu — uniquement ce qui doit être joignable
   ansible.posix.firewalld:
@@ -47,4 +47,4 @@
       kernel.kptr_restrict=2
       kernel.dmesg_restrict=1
       net.ipv4.conf.all.log_martians=1
-  notify: reload sysctl
+  notify: Reload sysctl

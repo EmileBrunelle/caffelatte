@@ -5,10 +5,12 @@
   ansible.builtin.command:
     cmd: "podman secret create --replace {{ item.name }} -"
     stdin: "{{ item.value }}"
+  become: true
   become_user: svc
   loop:
     - { name: rcon_password, value: "{{ rcon_password }}" }
     - { name: forwarding_secret, value: "{{ forwarding_secret }}" }
+    - { name: floodgate_key, value: "{{ floodgate_key }}" }
   no_log: true
   changed_when: true
 
@@ -17,6 +19,7 @@
   # Internet, il n'a rien à écrire dans les données du monde. Il n'y garde que
   # sa liste d'invitations.
   ansible.builtin.command: "podman volume exists {{ item }} || podman volume create {{ item }}"
+  become: true
   become_user: svc
   loop: [minecraft-data, gate-data]
   changed_when: false
@@ -30,6 +33,14 @@
   # Gate surveille ce fichier et recharge à chaud : pas de notify, pas de
   # redémarrage, personne n'est déconnecté.
 
+- name: Config Geyser
+  ansible.builtin.template:
+    src: geyser.yml.j2
+    dest: /home/svc/.config/geyser/config.yml
+    owner: svc
+    mode: "0640"
+  notify: Reload user systemd
+
 - name: Unités Quadlet
   ansible.builtin.template:
     src: "{{ item }}"
@@ -37,7 +48,7 @@
     owner: svc
     mode: "0644"
   loop: [mc.network, minecraft.container, gate.container, geyser.container]
-  notify: reload user systemd
+  notify: Reload user systemd
 
 - name: Démarrer
   ansible.builtin.command: "{{ svc_systemctl }} enable --now {{ item }}"

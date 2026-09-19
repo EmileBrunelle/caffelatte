@@ -1,18 +1,20 @@
 # Sauvegarde hors site. Hypothèse de conception : Oracle peut couper le service
 # sans préavis (ils ont halvé le tier gratuit ARM le 2026-06-15 sans annonce).
 # Rien ici n'est spécifique à Oracle : la cible est du S3 générique.
-- name: restic
+- name: Installer restic
   ansible.builtin.dnf: { name: restic, state: present }
 
 - name: Secrets restic (dépôt + identifiants S3)
   ansible.builtin.command:
     cmd: "podman secret create --replace {{ item.name }} -"
     stdin: "{{ item.value }}"
+  become: true
   become_user: svc
   loop:
     - { name: restic_password, value: "{{ restic_password }}" }
-    - { name: restic_s3_key,   value: "{{ restic_s3_key }}" }
+    - { name: restic_s3_key, value: "{{ restic_s3_key }}" }
   no_log: true
+  changed_when: true
 
 - name: Script de sauvegarde
   ansible.builtin.template:
@@ -28,4 +30,4 @@
     owner: svc
     mode: "0644"
   loop: [backup.service, backup.timer]
-  notify: reload user systemd
+  notify: Reload user systemd

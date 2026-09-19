@@ -11,6 +11,7 @@ Network=podman
 PublishPort=25565:25565/tcp
 Volume=%h/.config/gate:/etc/gate:ro,Z
 Secret=forwarding_secret
+Secret=floodgate_key
 # Liste d'autorisation du serveur, portée par Gate lui-même. Volume PROPRE à
 # Gate, surtout pas minecraft-data : Gate est le composant exposé à Internet,
 # lui donner un accès en écriture aux données de jeu est exactement ce qu'on

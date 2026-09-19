@@ -2,7 +2,11 @@ config:
   bind: 0.0.0.0:25565
   onlineMode: true              # Gate fait l'auth Mojang ; le backend fait confiance
   forwarding:
-    mode: modern                # secret partagé vérifié par FabricProxy-Lite
+    # "velocity" est le nom Gate du forwarding moderne (chiffré) — "modern" n'est
+    # pas une valeur reconnue par Gate v0.74.0 et fait échouer la validation au
+    # démarrage (pkg/edition/java/config/config.go, ligne "Unknown forwarding
+    # mode"). FabricProxy-Lite parle bien ce protocole sous le nom "modern".
+    mode: velocity              # secret partagé vérifié par FabricProxy-Lite
     velocitySecret: "${FORWARDING_SECRET}"
 
   servers:
@@ -21,6 +25,19 @@ config:
     threshold: 256
   connectionTimeout: 5s
   readTimeout: 30s
+
+  # Bedrock/Floodgate (gate.minekube.com/guide/bedrock, vérifié sur le code
+  # source v0.74.0 : pkg/edition/bedrock/config/config.go). Geyser tourne en
+  # conteneur standalone séparé (containers/geyser) : Gate ne le gère pas lui-même.
+  bedrock:
+    enabled: true
+    managed:
+      enabled: false             # Geyser standalone, pas géré par Gate
+    geyserListenAddr: "0.0.0.0:{{ geyser_listen_port | default(25567) }}"
+    floodgateKeyPath: /run/secrets/floodgate_key
+    backendFloodgate:
+      enabled: true
+      allowedServers: [survie]
 
 # La config du plugin d'invitation n'est PAS ici : Gate désérialise ce fichier
 # dans sa propre structure et ré-injecte le résultat dans viper, ce qui élimine
