@@ -4,7 +4,9 @@
 # tourne dedans. Rien d'autre ne traverse.
 
 terraform {
-  required_version = ">= 1.9"
+  # OpenTofu, pas Terraform (ADR 0011). Plancher VÉRIFIÉ sur 1.11.5 : c'est la
+  # version où `use_lockfile` du backend s3 est confirmé présent.
+  required_version = ">= 1.11"
   required_providers {
     oci = { source = "oracle/oci", version = "~> 6.0" }
   }
@@ -17,6 +19,8 @@ terraform {
     skip_credentials_validation = true
     skip_requesting_account_id  = true
     use_path_style              = true
+    # Verrou d'état : deux `apply` en parallèle corrompent le fichier.
+    use_lockfile = true
   }
 }
 
@@ -73,7 +77,9 @@ resource "oci_core_security_list" "public" {
       max = 19132
     }
   }
-  # SSH n'est PAS ici : l'accès passe par OCI Bastion, donc aucun port 22 exposé.
+  # SSH n'est PAS ici, et il n'y a PAS de bastion non plus : le 22 sortant est
+  # bloqué sur le réseau de l'opérateur, donc un bastion serait injoignable.
+  # Déploiement par ansible-pull (443), bris de glace par Cloud Shell. ADR 0010.
 }
 
 resource "oci_core_subnet" "public" {
@@ -99,8 +105,8 @@ resource "oci_core_instance" "core" {
   }
 
   source_details {
-    source_type             = "image"
-    source_id               = var.arm_image_id
+    source_type = "image"
+    source_id   = var.arm_image_id
     # Comptabilité du stockage bloc gratuit : 200 Go au TOTAL pour le tenancy,
     # volumes de démarrage inclus. 100 ici en laisse 100 pour les deux micro x86
     # (47 Go chacun par défaut). Dépasser facture, silencieusement.

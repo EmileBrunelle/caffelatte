@@ -33,11 +33,12 @@ jobs:
           ignore-unfixed: true
           exit-code: "1"
 
-  terraform:
+  opentofu:
     runs-on: ubuntu-latest
-    permissions: { contents: read, packages: write, id-token: write }
+    permissions: { contents: read }
     steps:
       - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - run: terraform -chdir=terraform init -backend=false && terraform -chdir=terraform validate
+      - uses: opentofu/setup-opentofu@v1
+      - run: tofu -chdir=terraform fmt -check
+      - run: tofu -chdir=terraform init -backend=false && tofu -chdir=terraform validate
       - uses: aquasecurity/tfsec-action@v1.0.3

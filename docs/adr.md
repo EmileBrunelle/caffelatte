@@ -164,3 +164,42 @@ pression soutenue jusqu'en 2028, certaines analyses jusqu'en 2030.
 
 **Décision :** Oracle en premier, et la règle d'arrêt de trois semaines est
 levée. L'écart de valeur justifie d'attendre plus longtemps.
+
+## 0010 — Accès à l'hôte : `ansible-pull` sur 443, pas de bastion (2026-09-19)
+**Décidé :** aucune ressource `oci_bastion_bastion`, aucun port 22 dans la
+Security List. Le déploiement normal est `ansible-pull` — l'hôte va chercher le
+dépôt en HTTPS. Le bris de glace est Cloud Shell (navigateur, 443), puis la
+console série de l'instance si le réseau de l'hôte est mort.
+**Pourquoi :** le port 22 **sortant** est bloqué sur le réseau de l'opérateur —
+VÉRIFIÉ : `github.com:22` et `host.bastion.ca-montreal-1.oci.oraclecloud.com:22`
+refusent tous deux la connexion, alors que le 443 passe. Les sessions OCI Bastion
+(managed-SSH comme port-forwarding) se connectent à leur endpoint sur le 22 : un
+bastion serait provisionné, gratuit, et inutilisable. Le VPN Primat n'y change
+rien — il est en split tunnel, l'IP sortante reste celle du FAI (VÉRIFIÉ
+2026-09-19). Ansible en mode *push* depuis le portable est donc mort sur ce
+réseau, ce qui promeut `ansible-pull` de « un jour » à mécanisme principal.
+**Écarté :** le bastion OCI (gratuit mais injoignable d'ici, et il faudrait
+encore vérifier le plugin Oracle Cloud Agent et les contraintes de sous-réseau) ;
+ouvrir le 22 au monde dans la Security List (expose la surface *et* ne marche
+toujours pas d'ici, le blocage étant sortant).
+**Conséquence à ne pas oublier :** `ansible-pull` tirera d'une branche `deploy`,
+jamais de `master` — le dépôt est public, une poussée irait droit en production.
+
+## 0011 — OpenTofu, pas Terraform (2026-09-19)
+**Décidé :** `tofu`, paquet officiel de Fedora (1.11.5). La CI utilise
+`opentofu/setup-opentofu`.
+**Pourquoi :** Fedora n'empaquette plus Terraform depuis le passage à la licence
+BUSL (août 2023) — le seul choix géré par `dnf` est OpenTofu. Un binaire déposé
+à la main dans `~/.local/bin` échappe à `dnf-automatic` et pourrit en silence,
+ce qui est exactement ce que ce dépôt refuse ailleurs. Bonus mesuré, pas
+supposé : le backend `s3` d'OpenTofu **n'envoie pas** l'encodage « aws-chunked »
+qu'OCI rejette. Sous Terraform 1.16 il fallait `skip_s3_checksum = true` **plus**
+`AWS_REQUEST_CHECKSUM_CALCULATION=when_required` et
+`AWS_RESPONSE_CHECKSUM_VALIDATION=when_required` dans une enveloppe shell, sinon
+tout `PutObject` (donc le verrou d'état) partait en 501. VÉRIFIÉ : sous OpenTofu,
+`plan` prend et relâche le verrou sans aucun des trois. L'enveloppe est supprimée.
+**Écarté :** ajouter le dépôt dnf de HashiCorp (garde la BUSL dans un dépôt
+public destiné au portfolio, pour zéro gain fonctionnel ici) ; garder le binaire
+non géré (dette qu'on aurait payée à la prochaine CVE du SDK AWS).
+**Piège à retenir :** `init` ne fait que LIRE l'état. Un backend « initialisé
+avec succès » peut être mort en écriture — le test réel est `plan` avec verrou.

@@ -66,7 +66,7 @@ ailleurs en moins d'une heure ». Voir `docs/runbook-restore.md`.
 - [x] Sauvegarde restic hors site avec gel du monde
 - [ ] Binaire Gate maison + plugin de maintenance
 - [ ] Geyser / Floodgate
-- [ ] Bastion, budget et alertes (Terraform)
+- [ ] Budget et alertes (Terraform) — pas de bastion, voir ADR 0010
 
 Services envisagés, mis en attente : Forgejo, OIDC, Grafana + Loki, chat vocal.
 Aucun n'enseigne quoi que ce soit sur OCI, et chacun consomme une part des 12 Go.

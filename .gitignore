@@ -12,3 +12,5 @@ floodgate.pem
 HANDOFF.md
 # Cache local d'ansible-lint / ansible-galaxy.
 .ansible/
+# Config du backend OpenTofu : contient la Customer Secret Key.
+terraform/backend.hcl
