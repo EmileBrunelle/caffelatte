@@ -196,7 +196,7 @@ encore vérifier le plugin Oracle Cloud Agent et les contraintes de sous-réseau
 ouvrir le 22 au monde dans la Security List (expose la surface *et* ne marche
 toujours pas d'ici, le blocage étant sortant).
 **Conséquences à ne pas oublier :**
-- `ansible-pull` tirera d'une branche `deploy`, jamais de `master` — le dépôt est
+- `ansible-pull` tirera d'une branche `deploy`, jamais de `main` — le dépôt est
   public, une poussée irait droit en production.
 - **La console série exige une clé RSA** — ed25519 est refusé (VÉRIFIÉ dans la
   doc Oracle, la question traînait comme inconnue depuis plusieurs sessions).
