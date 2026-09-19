@@ -102,3 +102,32 @@ configuration, pas de plan, pas de suppression fiable) ; console à la main (une
 vingtaine de minutes, mais irreproductible — or « reconstruire ailleurs » est
 l'exigence qui a lancé le projet) ; Terraform aussi pour les conteneurs (le
 provider Podman existe et ne vaut rien face à Quadlet).
+
+## 0008 — Un seul hôte payé, pas un proxy payé devant une VM Oracle allumée à la demande
+**Décidé :** tout sur un VPS payé au Québec. Le compte Oracle Always Free reste,
+mais comme bac à sable d'apprentissage et cible de sauvegarde — jamais sur le
+chemin du jeu.
+
+**L'idée écartée :** un petit VPS payé qui garde Gate allumé en permanence et
+démarre/arrête la VM ARM Oracle selon la présence de joueurs.
+
+**Pourquoi ça ne marche pas :**
+1. *Ça provoque exactement ce qu'on veut éviter.* Une instance Always Free
+   arrêtée compte comme inactive. Le critère de récupération (CPU, réseau et
+   mémoire tous sous 20 % sur 7 jours) est rempli en continu par une machine
+   éteinte. On garantit la récupération au lieu de l'éviter.
+2. *Le redémarrage est un pari.* Rallumer une instance ARM Always Free peut
+   échouer en « Out of capacity » — le problème même qui rend Oracle incertain
+   pour cet usage. Le serveur deviendrait indisponible de façon aléatoire, à
+   chaque fois que quelqu'un veut jouer.
+3. *Le délai est visible.* Démarrage d'instance (1-2 min) plus démarrage du
+   serveur (~1 min) contre un redémarrage de conteneur (~40 s). Le joueur
+   attend trois fois plus longtemps.
+
+**Et surtout :** on paie déjà le VPS. Ajouter Oracle derrière n'économise rien —
+ça ajoute un deuxième hôte, de la latence entre les deux, des identifiants d'API
+OCI sur une machine exposée, et la loterie de capacité. Le gain est nul.
+
+**Conséquence sur l'inventaire :** le groupe `edge` devient optionnel. Il reste
+valide si le jeu tourne un jour sur Oracle, mais l'installation par défaut est
+un seul hôte.

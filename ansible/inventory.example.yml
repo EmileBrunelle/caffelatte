@@ -1,9 +1,15 @@
 # cp inventory.example.yml inventory.yml puis remplir. inventory.yml est gitignoré.
+#
+# Installation par défaut : UN hôte. Voir docs/adr.md 0008 — séparer le proxy
+# du serveur de jeu sur deux fournisseurs ajoute de la latence et un point de
+# panne sans rien économiser.
 all:
   children:
-    arm:      # VM.Standard.A1.Flex — tout le lourd
+    arm:
       hosts:
         core: { ansible_host: 203.0.113.10, ansible_user: opc }
-    edge:     # VM.Standard.E2.1.Micro x86 — reverse proxy HTTP seulement
-      hosts:
-        edge1: { ansible_host: 203.0.113.11, ansible_user: opc }
+
+    # Optionnel : seulement si le jeu tourne sur Oracle et qu'on veut garder
+    # l'IP de la VM hors de la vue publique. Inutile sur un VPS unique.
+    edge:
+      hosts: {}
