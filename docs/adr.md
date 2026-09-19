@@ -60,10 +60,15 @@ Retenus :
 - **Email Delivery** — le SMTP sortant depuis une IP de cloud public est bloqué
   à peu près partout ; Forgejo et le serveur d'authentification ont besoin
   d'envoyer des courriels. C'est le service qui rapporte le plus pour l'effort.
-- **Bastion** — accès SSH sans port 22 ouvert sur Internet.
+- ~~**Bastion**~~ — **ANNULÉ le 2026-09-19 par l'ADR 0010.** Les sessions Bastion
+  se connectent à leur endpoint sur le port 22, et le 22 SORTANT est bloqué sur
+  le réseau de l'opérateur : le service serait provisionné, gratuit, et
+  injoignable. Remplacé par un 22 ouvert au CIDR du VCN seulement, joint depuis
+  Cloud Shell attaché au VCN.
 - **Functions + Notifications** — sonde externe de disponibilité. Une machine ne
   peut pas surveiller sa propre panne ; c'est le seul rôle qui *exige* d'être
-  ailleurs.
+  ailleurs. **PAS ENCORE IMPLÉMENTÉ** — c'est le trou le plus large de cette
+  liste, et le seul élément retenu dont rien n'existe dans le dépôt.
 
 Écartés :
 - **Load Balancer** (10 Mbps gratuits) — Caddy sur la VM x86 fait le même travail
@@ -166,10 +171,18 @@ pression soutenue jusqu'en 2028, certaines analyses jusqu'en 2030.
 levée. L'écart de valeur justifie d'attendre plus longtemps.
 
 ## 0010 — Accès à l'hôte : `ansible-pull` sur 443, pas de bastion (2026-09-19)
-**Décidé :** aucune ressource `oci_bastion_bastion`, aucun port 22 dans la
-Security List. Le déploiement normal est `ansible-pull` — l'hôte va chercher le
-dépôt en HTTPS. Le bris de glace est Cloud Shell (navigateur, 443), puis la
-console série de l'instance si le réseau de l'hôte est mort.
+**Décidé :** aucune ressource `oci_bastion_bastion`. Le port 22 est ouvert en
+entrée **depuis le CIDR du VCN seulement**, jamais depuis Internet. Le
+déploiement normal est `ansible-pull` — l'hôte va chercher le dépôt en HTTPS. Le
+bris de glace est Cloud Shell attaché au VCN (« private network access »), puis
+la console série de l'instance si le réseau de l'hôte est mort.
+
+**Correction du 2026-09-19, même jour :** la première version de cet ADR disait
+« aucun port 22 » ET « bris de glace par Cloud Shell ». C'était contradictoire :
+Cloud Shell joint l'instance par son IP, donc à travers la Security List. Sans
+règle 22, la machine démarrait injoignable par tout sauf la console série. Une
+Security List et un accès hors-bande ne sont pas la même couche — seule la
+console série passe par l'hyperviseur et ignore la Security List.
 **Pourquoi :** le port 22 **sortant** est bloqué sur le réseau de l'opérateur —
 VÉRIFIÉ : `github.com:22` et `host.bastion.ca-montreal-1.oci.oraclecloud.com:22`
 refusent tous deux la connexion, alors que le 443 passe. Les sessions OCI Bastion
@@ -182,8 +195,19 @@ réseau, ce qui promeut `ansible-pull` de « un jour » à mécanisme principal.
 encore vérifier le plugin Oracle Cloud Agent et les contraintes de sous-réseau) ;
 ouvrir le 22 au monde dans la Security List (expose la surface *et* ne marche
 toujours pas d'ici, le blocage étant sortant).
-**Conséquence à ne pas oublier :** `ansible-pull` tirera d'une branche `deploy`,
-jamais de `master` — le dépôt est public, une poussée irait droit en production.
+**Conséquences à ne pas oublier :**
+- `ansible-pull` tirera d'une branche `deploy`, jamais de `master` — le dépôt est
+  public, une poussée irait droit en production.
+- **La console série exige une clé RSA** — ed25519 est refusé (VÉRIFIÉ dans la
+  doc Oracle, la question traînait comme inconnue depuis plusieurs sessions).
+  D'où `~/.ssh/caffelatte_console_rsa`, distincte de `caffelatte_ed25519`. Son
+  proxy se connecte sur le **443**, donc le réseau de l'opérateur ne la bloque pas.
+- Le réseau privé de Cloud Shell est **éphémère** : à réattacher à chaque session,
+  ou sauvegarder une définition nommée (max 5).
+- La doc Oracle ne confirme pas qu'un sous-réseau **public** est accepté comme
+  cible du réseau privé Cloud Shell — elle ne l'interdit pas non plus. Si la
+  Console refuse, le repli est un `/28` privé dédié, sans toucher au sous-réseau
+  de l'instance.
 
 ## 0011 — OpenTofu, pas Terraform (2026-09-19)
 **Décidé :** `tofu`, paquet officiel de Fedora (1.11.5). La CI utilise

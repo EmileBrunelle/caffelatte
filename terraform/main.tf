@@ -29,6 +29,12 @@ resource "oci_core_vcn" "main" {
   cidr_blocks    = ["10.0.0.0/16"]
   display_name   = "caffelatte"
   dns_label      = "caffelatte"
+  # Double pile dès la naissance du VCN, PAS plus tard : la doc confirme que
+  # l'ajout après coup est supporté, mais on n'a pas pu confirmer que ce drapeau
+  # n'est pas ForceNew dans le provider épinglé — et un VCN recréé emporte le
+  # sous-réseau, donc l'instance, donc la capacité ARM qu'on ne pourrait pas ravoir.
+  # Sens unique assumé : une fois activé, OCI ne permet plus de désactiver.
+  is_ipv6enabled = true
 }
 
 resource "oci_core_internet_gateway" "main" {
@@ -41,6 +47,12 @@ resource "oci_core_route_table" "main" {
   vcn_id         = oci_core_vcn.main.id
   route_rules {
     destination       = "0.0.0.0/0"
+    network_entity_id = oci_core_internet_gateway.main.id
+  }
+  # L'IPv6 ne suit pas la route IPv4 : sans cette entrée, la pile v6 est muette.
+  route_rules {
+    destination       = "::/0"
+    destination_type  = "CIDR_BLOCK"
     network_entity_id = oci_core_internet_gateway.main.id
   }
 }
@@ -57,11 +69,28 @@ resource "oci_core_security_list" "public" {
     protocol    = "all"
   }
 
+  egress_security_rules {
+    destination = "::/0"
+    protocol    = "all"
+  }
+
   dynamic "ingress_security_rules" {
     for_each = var.public_tcp_ports
     content {
       protocol = "6" # TCP
       source   = "0.0.0.0/0"
+      tcp_options {
+        min = ingress_security_rules.value
+        max = ingress_security_rules.value
+      }
+    }
+  }
+
+  dynamic "ingress_security_rules" {
+    for_each = var.public_tcp_ports
+    content {
+      protocol = "6" # TCP
+      source   = "::/0"
       tcp_options {
         min = ingress_security_rules.value
         max = ingress_security_rules.value
@@ -77,9 +106,28 @@ resource "oci_core_security_list" "public" {
       max = 19132
     }
   }
-  # SSH n'est PAS ici, et il n'y a PAS de bastion non plus : le 22 sortant est
-  # bloqué sur le réseau de l'opérateur, donc un bastion serait injoignable.
-  # Déploiement par ansible-pull (443), bris de glace par Cloud Shell. ADR 0010.
+
+  ingress_security_rules {
+    protocol = "17" # UDP — Bedrock
+    source   = "::/0"
+    udp_options {
+      min = 19132
+      max = 19132
+    }
+  }
+  # SSH n'est ouvert QUE depuis l'intérieur du VCN, jamais depuis Internet. Le
+  # seul client légitime est Cloud Shell attaché au VCN (« private network
+  # access »), qui pique une IP éphémère dans ce même CIDR. Pas de bastion : le
+  # 22 SORTANT est bloqué sur le réseau de l'opérateur, donc il serait
+  # injoignable. Déploiement par ansible-pull sur 443. ADR 0010.
+  ingress_security_rules {
+    protocol = "6" # TCP
+    source   = oci_core_vcn.main.cidr_blocks[0]
+    tcp_options {
+      min = 22
+      max = 22
+    }
+  }
 }
 
 resource "oci_core_subnet" "public" {
@@ -89,6 +137,8 @@ resource "oci_core_subnet" "public" {
   route_table_id    = oci_core_route_table.main.id
   security_list_ids = [oci_core_security_list.public.id]
   dns_label         = "public"
+  # OCI impose /64 par sous-réseau : 8 bits de plus que le /56 du VCN.
+  ipv6cidr_block = cidrsubnet(oci_core_vcn.main.ipv6cidr_blocks[0], 8, 0)
 }
 
 # 2 OCPU / 12 Go : plafond Always Free depuis le 2026-06-15. Demander plus
@@ -108,13 +158,22 @@ resource "oci_core_instance" "core" {
     source_type = "image"
     source_id   = var.arm_image_id
     # Comptabilité du stockage bloc gratuit : 200 Go au TOTAL pour le tenancy,
-    # volumes de démarrage inclus. 100 ici en laisse 100 pour les deux micro x86
-    # (47 Go chacun par défaut). Dépasser facture, silencieusement.
-    boot_volume_size_in_gbs = 100
+    # volumes de démarrage inclus. 50 ici + 50 pour le volume de données =
+    # 100, ce qui laisse 100 pour les deux micro x86 (47 Go chacun par
+    # défaut). Dépasser facture, silencieusement.
+    #
+    # 50 et pas 100 : le démarrage doit rester JETABLE. Un volume de démarrage
+    # s'agrandit à chaud mais ne se rétrécit qu'en recréant l'instance — d'où
+    # ce découpage dès maintenant, tant que rien n'existe.
+    boot_volume_size_in_gbs = 50
   }
 
   create_vnic_details {
     subnet_id = oci_core_subnet.public.id
+    # L'IPv4 publique reste ÉPHÉMÈRE (louée à un pool, elle peut bouger). Cette
+    # IPv6-ci vient du préfixe du VCN : elle est stable tant que le VCN vit,
+    # c'est donc elle la cible DNS fiable.
+    assign_ipv6ip = true
   }
 
   metadata = {
@@ -126,6 +185,27 @@ resource "oci_core_instance" "core" {
   lifecycle {
     ignore_changes = [source_details[0].source_id] # pas de recréation sur nouvelle image
   }
+}
+
+# Le monde Minecraft vit ICI, pas sur le volume de démarrage. L'instance A1 est
+# la ressource qu'on risque de perdre (capacité ARM intermittente, récupération
+# Oracle pour inactivité) ; un volume séparé se détache et se rattache à une
+# machine neuve en secondes, là où une restauration restic coûte une soirée.
+# restic reste la vraie sauvegarde — ceci est de la disponibilité, pas du backup.
+resource "oci_core_volume" "donnees" {
+  compartment_id      = var.compartment_id
+  availability_domain = var.availability_domain
+  display_name        = "caffelatte-donnees"
+  size_in_gbs         = 50
+}
+
+resource "oci_core_volume_attachment" "donnees" {
+  instance_id = oci_core_instance.core.id
+  volume_id   = oci_core_volume.donnees.id
+  # Paravirtualisé, pas iSCSI : le disque apparaît tout seul au démarrage.
+  # L'iSCSI exigerait une séquence iscsiadm à rejouer à chaque reboot, donc du
+  # code d'amorçage supplémentaire pour exactement le même résultat.
+  attachment_type = "paravirtualized"
 }
 
 resource "oci_objectstorage_bucket" "backup" {

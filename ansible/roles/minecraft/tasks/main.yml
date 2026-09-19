@@ -14,14 +14,55 @@
   no_log: true
   changed_when: true
 
+- name: Système de fichiers du disque de données déjà présent ?
+  # blkid ne renvoie rien sur un disque vierge : c'est notre seul signal pour
+  # savoir s'il faut formater. Ne JAMAIS reformater un disque qui porte déjà
+  # un système de fichiers — c'est le monde des joueurs.
+  ansible.builtin.command: "blkid -o value -s TYPE {{ minecraft_data_device }}"
+  register: minecraft_data_blkid
+  changed_when: false
+  failed_when: false
+
+- name: Formater le disque de données en xfs (une seule fois, disque vierge)
+  ansible.builtin.command: "mkfs.xfs {{ minecraft_data_device }}"
+  when: minecraft_data_blkid.stdout == ""
+  changed_when: true
+
+- name: Point de montage du disque de données
+  ansible.builtin.file:
+    path: "{{ minecraft_data_path }}"
+    state: directory
+    mode: "0755"
+
+- name: Monter le disque de données
+  # nofail : un disque absent au boot ne doit pas bloquer le démarrage, sinon
+  # le seul recours pour reprendre la main est la console série OCI.
+  ansible.posix.mount:
+    path: "{{ minecraft_data_path }}"
+    src: "{{ minecraft_data_device }}"
+    fstype: xfs
+    opts: nofail
+    state: mounted
+
+- name: Propriété du répertoire de données pour le conteneur rootless
+  # Le montage se fait en root (tâche privilégiée) mais podman tourne en
+  # rootless sous svc : sans ce chown, le conteneur ne peut pas écrire dans
+  # /data malgré le :Z sur le bind mount.
+  ansible.builtin.file:
+    path: "{{ minecraft_data_path }}"
+    owner: svc
+    group: svc
+
 - name: Volumes d'état
-  # gate-data est SÉPARÉ de minecraft-data : Gate est le conteneur exposé à
-  # Internet, il n'a rien à écrire dans les données du monde. Il n'y garde que
-  # sa liste d'invitations.
+  # gate-data reste un volume podman nommé : Gate est le conteneur exposé à
+  # Internet, il n'a rien à écrire dans les données du monde, et sa liste
+  # d'invitations n'a pas besoin de survivre seule à la perte de l'instance.
+  # minecraft-data, lui, est maintenant un bind mount sur le disque de
+  # données (voir plus haut) et ne passe plus par ici.
   ansible.builtin.command: "podman volume exists {{ item }} || podman volume create {{ item }}"
   become: true
   become_user: svc
-  loop: [minecraft-data, gate-data]
+  loop: [gate-data]
   changed_when: false
 
 - name: Config Gate

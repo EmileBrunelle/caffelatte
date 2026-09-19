@@ -1,0 +1,5 @@
+# Nom stable fourni par les règles udev d'Oracle Linux pour un volume bloc
+# attaché en paravirtualisé. /dev/sdb (ou vd*) peut changer d'une attache à
+# l'autre ; ce chemin-là ne bouge pas.
+minecraft_data_device: /dev/oracleoci/oraclevdb
+minecraft_data_path: /srv/minecraft

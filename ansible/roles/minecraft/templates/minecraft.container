@@ -1,13 +1,32 @@
 [Unit]
 Description=Serveur Minecraft (Fabric)
 After=mc-network.service
+# Sans cette ligne, le conteneur peut démarrer AVANT que /srv/minecraft soit
+# monté. Podman créerait alors le point de montage sur le disque de démarrage,
+# Minecraft y générerait un monde NEUF, et le vrai montage viendrait se poser
+# par-dessus en le cachant : les joueurs verraient un monde vide et les vraies
+# données seraient invisibles sous le montage. Le `nofail` du montage rend ce
+# scénario PLUS probable, pas moins — il laisse le boot continuer sans disque.
+# ponytail: NON VÉRIFIÉ sur une unité rootless — les unités .mount vivent dans
+# le gestionnaire systemd SYSTÈME, pas dans celui de l'utilisateur, donc cette
+# directive peut être sans effet ici. Le filet qui tient de toute façon :
+# user@.service démarre après local-fs.target. À confirmer sur la vraie machine
+# (`systemctl --user show mc-minecraft -p RequiresMountsFor`) ; si c'est vide,
+# la vraie correction est un ExecStartPre qui refuse de démarrer sans montage.
+RequiresMountsFor={{ minecraft_data_path }}
 
 [Container]
 Image=ghcr.io/{{ github_org }}/minecraft:{{ minecraft_version }}
 ContainerName=minecraft
 Network=mc.network
 # AUCUN PublishPort : le serveur n'est joignable que par Gate, sur le réseau mc.
-Volume=minecraft-data.volume:/data:Z
+# Bind mount depuis l'hôte (disque bloc OCI dédié) et non un volume podman
+# nommé : le monde survit à la perte de l'instance et se rattache tel quel à
+# une machine neuve, sans dépendre du volume de démarrage.
+# ponytail: `:Z` relabellise SELinux de façon récursive à CHAQUE démarrage —
+# sur un monde de plusieurs Go ça se paie en secondes de démarrage. Passer à un
+# `semanage fcontext` posé une fois si le démarrage devient long.
+Volume={{ minecraft_data_path }}:/data:Z
 Secret=rcon_password
 Secret=forwarding_secret
 Environment=HEAP={{ minecraft_heap }}
