@@ -150,8 +150,8 @@ pression soutenue jusqu'en 2028, certaines analyses jusqu'en 2030.
    la ligne de coût dominante sur un VPS payé aujourd'hui.
 2. *Les 12 Go gratuits d'Oracle sont un actif qui prend de la valeur.* Une
    allocation figée à 0 $ pendant que le prix de marché de la RAM explose.
-3. *Et ça explique probablement la coupe du 15 juin 2026* (4 OCPU / 24 Go →
-   2 / 12, sans annonce). Donc **il faut s'attendre à ce qu'Oracle recoupe.**
+3. *Et ça explique probablement la coupe du début de juin 2026* (4 OCPU /
+   24 Go → 2 / 12, sans annonce). Donc **il faut s'attendre à ce qu'Oracle recoupe.**
    La portabilité du dépôt n'est pas de la paranoïa, c'est la réponse au
    mécanisme qui a déjà frappé une fois.
 4. *La disparition de petits fournisseurs s'accélère* — marges comprimées. Le

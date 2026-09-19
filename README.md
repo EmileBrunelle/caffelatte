@@ -24,7 +24,7 @@ aucun jeu de capacité. Mais un VPS n'enseigne aucun concept infonuagique.
 
 Le tier gratuit d'Oracle Cloud est l'hébergement actuel, pas une dépendance.
 Oracle a réduit l'allocation ARM gratuite de 4 OCPU / 24 Go à **2 OCPU / 12 Go**
-le 15 juin 2026, sans annonce ni notification. Le projet part donc du principe
+au début de juin 2026, sans annonce ni notification. Le projet part donc du principe
 que l'hébergeur peut disparaître du jour au lendemain :
 
 - rien de spécifique à OCI dans le code (pas de service managé, pas de SDK) ;

@@ -157,7 +157,7 @@ resource "oci_core_subnet" "public" {
   ipv6cidr_block = cidrsubnet(oci_core_vcn.main.ipv6cidr_blocks[0], 8, 0)
 }
 
-# 2 OCPU / 12 Go : plafond Always Free depuis le 2026-06-15. Demander plus
+# 2 OCPU / 12 Go : plafond Always Free depuis le début de juin 2026. Demander plus
 # échoue en LimitExceeded, ce qui ressemble à tort à un manque de capacité.
 resource "oci_core_instance" "core" {
   compartment_id      = var.compartment_id

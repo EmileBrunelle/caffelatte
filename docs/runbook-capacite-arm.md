@@ -5,9 +5,18 @@
 l'inscription — en changer est une demande de service, pas une case à cocher.
 Donc : tester la capacité *avant* de construire quoi que ce soit dessus.
 
-Depuis le 15 juin 2026 le maximum gratuit est **2 OCPU / 12 Go** (contre 4 / 24
-avant). Ne pas demander 4 OCPU : la requête échoue pour dépassement de quota,
-pas pour manque de capacité, et le message ne le distingue pas clairement.
+Depuis le début de juin 2026 le maximum gratuit est **2 OCPU / 12 Go** (contre
+4 / 24 avant). Ne pas demander 4 OCPU : la requête échoue pour dépassement de
+quota, pas pour manque de capacité, et le message ne le distingue pas clairement.
+
+La date vient des archives de la page officielle des limites Always Free, seule
+preuve primaire trouvée : la capture du **2026-06-05 11:22 UTC** dit encore
+« 4 OCPUs and 24 GB », celle du **2026-06-12 14:42 UTC** dit « 2 OCPUs and
+12 GB ». Aucune capture entre les deux, donc la fenêtre ne se resserre pas
+davantage. Les dates du 15 juin et du 18 août qui circulent sont toutes deux
+fausses — ne pas les réintroduire.
+
+    https://web.archive.org/web/20260605112238/https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm
 
 ## Test unique
 
