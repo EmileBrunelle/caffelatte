@@ -245,6 +245,21 @@ appelle presque pas. Le premier vrai contact avec l'authentification, c'est
 `apply`. Même famille que le piège de l'ADR 0011 (`init` ne fait que lire), un
 étage plus haut — et les deux chemins d'authentification sont disjoints : le
 backend d'état passe par une Customer Secret Key, le provider par le jeton.
+**Deuxième profil, à clé d'API (`CaffeLatteAuto`) :** la boucle d'attente de
+capacité ne peut pas dépendre d'un jeton qui meurt en une heure. `auth_oci` et
+`profil_oci` laissent choisir ; une `validation` refuse un mode incohérent, les
+deux étant incompatibles (l'un exige un fichier de jeton, l'autre une empreinte
+et une clé privée).
+
+**Piège vérifié aujourd'hui :** une clé d'API fraîchement téléversée met
+quelques minutes à devenir utilisable, et l'erreur est le même
+`401-NotAuthenticated` qu'une configuration fausse. MESURÉ : échec à 3 min après
+le téléversement, succès à ~7 min, sans rien changer d'autre. C'est exactement
+le délai déjà constaté sur la Customer Secret Key (ADR 0011) — même piège, autre
+type de clé. Corollaire testé explicitement pour ne pas inscrire une fausse
+leçon : les lignes de commentaire dans `~/.oci/config` ne gênent PAS le provider,
+l'hypothèse a été rejetée en remettant un commentaire et en replanifiant.
+
 **Conséquence opérationnelle :** le jeton expire après une heure. Une session de
 travail qui dépasse ça doit relancer `oci session authenticate --profile-name
 CaffeLatte --region ca-montreal-1` — `oci session refresh` échoue une fois le
