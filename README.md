@@ -7,6 +7,19 @@ Tout en conteneurs rootless, déployé par Ansible, sauvegardé hors site.
 Le dépôt est public. Aucune adresse, aucun nom d'hôte, aucun secret en clair
 n'y figure — l'inventaire réel est hors dépôt, les secrets sont chiffrés (SOPS).
 
+## Objectif
+
+Apprendre Oracle Cloud Infrastructure — compartiments, politiques IAM, VCN et
+Security Lists, Bastion, budgets, stockage objet — sur une charge réelle plutôt
+que sur un tutoriel. Le serveur Minecraft est le prétexte : il faut que quelque
+chose tourne pour que les décisions d'infrastructure aient des conséquences.
+
+Objectif secondaire : à 0 $. Voir `docs/couts.md`.
+
+Ce n'est **pas** la façon la moins chère d'héberger un serveur Minecraft. Un VPS
+à Montréal coûterait quelques dollars par mois avec plus de RAM garantie et
+aucun jeu de capacité. Mais un VPS n'enseigne aucun concept infonuagique.
+
 ## Contrainte de conception
 
 Le tier gratuit d'Oracle Cloud est l'hébergement actuel, pas une dépendance.
@@ -53,8 +66,11 @@ ailleurs en moins d'une heure ». Voir `docs/runbook-restore.md`.
 - [x] Sauvegarde restic hors site avec gel du monde
 - [ ] Binaire Gate maison + plugin de maintenance
 - [ ] Geyser / Floodgate
-- [ ] Forgejo, Pocket-ID (OIDC), Grafana + Loki
-- [ ] Chat vocal + partage d'écran
+- [ ] Bastion, budget et alertes (Terraform)
+
+Services envisagés, mis en attente : Forgejo, OIDC, Grafana + Loki, chat vocal.
+Aucun n'enseigne quoi que ce soit sur OCI, et chacun consomme une part des 12 Go.
+À ajouter un par un une fois le socle stable — pas avant.
 
 ## Hors périmètre, et pourquoi
 
