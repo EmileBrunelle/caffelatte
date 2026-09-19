@@ -9,10 +9,12 @@ package main
 import (
 	"go.minekube.com/gate/cmd/gate"
 
+	"github.com/caffelatte/caffelatte/gate/internal/invitation"
 	"github.com/caffelatte/caffelatte/gate/internal/maintenance"
 )
 
 func main() {
 	maintenance.Register()
+	invitation.Register()
 	gate.Execute()
 }

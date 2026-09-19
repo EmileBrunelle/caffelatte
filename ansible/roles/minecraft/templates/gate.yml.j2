@@ -21,3 +21,17 @@ config:
     threshold: 256
   connectionTimeout: 5s
   readTimeout: 30s
+
+# La config du plugin d'invitation n'est PAS ici : Gate désérialise ce fichier
+# dans sa propre structure et ré-injecte le résultat dans viper, ce qui élimine
+# toute clé qu'il ne connaît pas. Voir les Environment= de gate.container.
+#
+# LA LISTE BLANCHE DU SERVEUR EST ICI, DANS GATE, PAS DANS LE BACKEND.
+# Le backend tourne avec white-list=false (containers/minecraft/entrypoint.sh)
+# et c'est délibéré : son réseau podman est Internal=true, donc « whitelist add »
+# ne peut pas résoudre un pseudo auprès de Mojang et échoue pour tout invité
+# absent de son cache. Gate a l'egress et fait déjà l'auth Mojang (onlineMode
+# ci-dessus) : il connaît le vrai UUID. Le plugin gate/internal/invitation
+# refuse au LoginEvent tout joueur hors liste, et comme le backend n'est
+# joignable QUE par Gate (aucun port publié), il n'existe aucun contournement.
+# Si tu réactives white-list côté backend, plus personne d'invité n'entre.

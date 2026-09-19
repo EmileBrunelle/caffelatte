@@ -32,3 +32,28 @@ maintenance_warn_minutes: [15, 5, 1]
 # à vide avec 4 Go réservés est ce qui empêche la récupération pour inactivité.
 minecraft_sleep_when_empty: false
 minecraft_sleep_after_minutes: 20
+
+# Liste d'autorisation du serveur. Elle vit DANS Gate, pas dans le backend :
+# le backend n'a pas d'accès sortant et ne peut donc pas résoudre un pseudo
+# auprès de Mojang (voir gate.yml.j2 et containers/minecraft/entrypoint.sh).
+# Un parrain tape « /invite <pseudo> » en jeu ; Gate résout le pseudo en UUID
+# chez Mojang et l'inscrit dans /var/lib/gate/invitations.json (volume gate-data).
+# Les parrains sont autorisés d'office, sans figurer dans le fichier.
+#
+# L'autorisation se fait par UUID, JAMAIS par pseudo : un pseudo se change, un
+# UUID non — et Gate est en onlineMode, donc l'UUID est authentifié.
+# Récupérer le sien : https://api.mojang.com/users/profiles/minecraft/<pseudo>
+#
+# ATTENTION : la liste vide fait échouer le démarrage de Gate, délibérément.
+# Sans parrain, personne ne peut inviter et personne ne peut entrer ; mieux vaut
+# un proxy qui refuse de démarrer qu'un serveur ouvert qu'on croit fermé.
+minecraft_parrains: []
+# Sous-ensemble des parrains autorisé à révoquer n'importe quelle invitation
+# (/uninvite), pas seulement la sienne. Sans administrateur, les invités d'un
+# parrain qu'on sort de minecraft_parrains restent autorisés sans que personne
+# ne puisse les retirer — ils ne sont PAS éjectés automatiquement, c'est
+# délibéré : retirer un parrain ne doit pas déconnecter ses amis par surprise.
+minecraft_admins: []
+# Plafond par parrain, pour borner les dégâts d'un compte compromis. Persisté :
+# il se déduit du nombre d'entrées du fichier, il tient donc au redémarrage.
+minecraft_plafond_invitations: 5

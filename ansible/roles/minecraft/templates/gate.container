@@ -11,6 +11,25 @@ Network=podman
 PublishPort=25565:25565/tcp
 Volume=%h/.config/gate:/etc/gate:ro,Z
 Secret=forwarding_secret
+# Liste d'autorisation du serveur, portée par Gate lui-même. Volume PROPRE à
+# Gate, surtout pas minecraft-data : Gate est le composant exposé à Internet,
+# lui donner un accès en écriture aux données de jeu est exactement ce qu'on
+# évite. La racine reste en lecture seule, ce volume est le seul point d'écriture.
+Volume=gate-data.volume:/var/lib/gate:U,Z
+# Config du plugin d'invitation. Elle passe par l'environnement et non par
+# config.yml : Gate redésérialise son fichier dans sa propre struct et jette
+# toute clé inconnue (pkg/gate/gate.go, fixedReadInConfig) — un plugin embarqué
+# ne peut rien y lire.
+# Plus de Secret=rcon_password : Gate ne parle plus RCON au backend, il tient
+# la liste chez lui. Un secret de moins monté dans le conteneur exposé.
+Environment=CAFFELATTE_PARRAINS={{ minecraft_parrains | join(',') }}
+Environment=CAFFELATTE_PLAFOND_INVITATIONS={{ minecraft_plafond_invitations }}
+# Administrateurs : peuvent révoquer n'importe quelle entrée avec /uninvite, y
+# compris celle d'un parrain retiré de minecraft_parrains. Un parrain ordinaire
+# ne révoque que ses propres invités. Vide = personne ne peut nettoyer les
+# entrées orphelines.
+Environment=CAFFELATTE_ADMINS={{ minecraft_admins | join(',') }}
+Environment=CAFFELATTE_LISTE=/var/lib/gate/invitations.json
 AutoUpdate=registry
 NoNewPrivileges=true
 DropCapability=ALL

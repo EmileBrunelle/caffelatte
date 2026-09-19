@@ -1,5 +1,6 @@
-# Binaire Gate maison : Gate standard plus le plugin de fenêtre de maintenance.
-FROM docker.io/library/golang:1.24 AS build
+# Binaire Gate maison : Gate standard, plus les plugins maison (fenêtre de
+# maintenance, liste d'invitation).
+FROM docker.io/library/golang:1.26 AS build
 WORKDIR /src
 COPY gate/go.mod gate/go.sum* ./
 RUN go mod download
