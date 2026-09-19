@@ -32,7 +32,18 @@ ansible-playbook ansible/site.yml --syntax-check
 
 **Le CI ne lance pas `go test`.** Il fait `ansible-lint`, un scan Trivy de
 l'image Minecraft (échec sur CVE haute/critique corrigeable) et
-`tofu fmt`/`validate`/`tfsec`. Les tests Go se lancent donc à la main.
+`tofu fmt`/`validate`/`checkov`. Les tests Go se lancent donc à la main.
+
+Le scan d'IaC est **Checkov, et pas tfsec ni `trivy config`** : ni l'un ni
+l'autre n'a de règle Oracle Cloud, donc tous deux passent en silence quoi qu'il
+y ait dans `terraform/`. Vérifié : sur une `oci_core_security_list` ouvrant le
+port 22 à `0.0.0.0/0`, tfsec répond « No problems detected » avec `passed: 0`.
+Les exemptions, chacune justifiée, vivent dans `.checkov.yaml`.
+
+Les CVE que le projet ne peut pas corriger lui-même (netty embarqué par Mojang
+dans `server.jar`, dépendances de `rcon-cli`) sont listées dans `.trivyignore`
+**avec une date d'expiration** : passé cette date le CI redevient rouge, pour
+qu'une exemption soit relue au lieu de devenir définitive.
 
 En usage normal, **on ne lance pas Ansible depuis le portable** : la machine se
 configure elle-même (voir plus bas). Le mode push
