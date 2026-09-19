@@ -61,6 +61,35 @@ ce segment), et exécuter le test monocœur avant de migrer le monde dessus.
 Ce que le gratuit d'Oracle vaut vraiment : environ 120 $ par an d'économie, en
 échange de la loterie de capacité et de la politique de récupération.
 
+## Ne pas payer 12 mois pour 4 mois de jeu
+
+Un serveur entre amis se joue par vagues : un mois intense quand une version
+sort, puis plus rien pendant l'été. Payer 12 mois pour ça est le vrai gaspillage,
+pas le prix mensuel.
+
+La facturation au mois permet de **détruire le VPS et de le recréer** quand le
+groupe revient. C'est exactement la capacité construite pour le scénario
+« Oracle disparaît » — `ansible-playbook site.yml` contre un hôte neuf, puis
+`restic restore`. Le monde, les bans et les ops sont dans les sauvegardes ; le
+serveur lui-même n'a aucun état à préserver.
+
+    # Fin de saison
+    /home/svc/bin/backup.sh && <détruire le VPS>
+
+    # Retour, sur un hôte neuf, environ une heure
+    ansible-playbook site.yml
+    restic restore latest --target /
+
+Coût réel à 6,50 $/mois pour 4-5 mois actifs : **30 à 35 $ par année**.
+
+C'est le paiement du travail d'infrastructure : une installation reproductible
+n'est pas qu'une bonne pratique à montrer, c'est ce qui rend l'hébergement
+jetable — et donc bon marché.
+
+À faire pour que ça tienne : un exercice de restauration pendant que le serveur
+tourne encore. Une restauration jamais testée n'est pas une restauration, et on
+la découvre au pire moment.
+
 ## État de la décision
 
 - **Oracle `ca-montreal-1`, Always Free** — 0 $, mais la capacité ARM est une
