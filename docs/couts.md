@@ -16,7 +16,12 @@ gratuites, et la capacité ARM devient nettement plus accessible. Mais le filet
 disparaît : une ressource payante se crée et se facture au lieu d'échouer.
 
 **Décision : rester Always Free, jamais convertir.** Le compte est personnel et
-personne ne surveille une facture quotidienne. La conversion est IRRÉVERSIBLE et
+personne ne surveille une facture quotidienne. Et surtout, le calcul penche d'un
+seul côté : c'est un projet pour le plaisir, pas un service commercial. Une
+indisponibilité ne fait perdre aucun revenu — elle ne coûte que des parties
+remises. Payer pour de la disponibilité, c'est donc acheter la seule chose dont
+ce projet n'a pas besoin. Cela écarte du même coup Pay As You Go ET l'hôte tiers
+payant, et laisse la patience, qui est gratuite. La conversion est IRRÉVERSIBLE et
 n'est jamais automatique — c'est un geste délibéré, donc un geste qu'on s'interdit.
 Attendre la capacité ARM coûte du temps ; la perdre de vue en Pay As You Go coûte
 de l'argent réel. Le runbook de capacité applique cette décision.

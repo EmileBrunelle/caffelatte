@@ -30,8 +30,11 @@ terraform {
 # bout d'une heure. Le backend d'état, lui, s'authentifie par Customer Secret
 # Key — les deux chemins sont disjoints, d'où un `init` vert sur un `apply` mort.
 provider "oci" {
-  auth                = "SecurityToken"
-  config_file_profile = "CaffeLatte"
+  # Les deux modes sont incompatibles : SecurityToken exige un fichier de jeton,
+  # ApiKey exige une empreinte et une cle privee. Le profil et le mode changent
+  # donc ensemble — voir la variable auth_oci.
+  auth                = var.auth_oci
+  config_file_profile = var.profil_oci
   # En mode SecurityToken le provider ne lit PAS la région du fichier de config :
   # sans cette ligne il échoue avec « can not get region from Terraform configuration ».
   region = "ca-montreal-1"

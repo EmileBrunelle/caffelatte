@@ -22,13 +22,38 @@ pas pour manque de capacité, et le message ne le distingue pas clairement.
 
 ## Boucle de réessai
 
-Toutes les 5 minutes, pas plus vite : OCI limite le débit des requêtes et un
-martèlement peut faire bloquer le compte.
+    ./scripts/attendre-capacite-arm.sh
 
-    until oci compute instance launch ... 2>/tmp/err; do
-      grep -q "Out of capacity" /tmp/err || { cat /tmp/err; break; }  # vraie erreur : arrêter
-      sleep 300
-    done
+Toutes les 5 minutes, pas plus vite : OCI limite le débit des requêtes et un
+martèlement peut faire bloquer le compte. Le script s'arrête tout seul sur une
+erreur qui n'est PAS un manque de capacité — sinon on martèle l'API pendant des
+jours sur une faute de configuration. `Ctrl-C` pour arrêter, relancer est sans
+danger : OpenTofu reprend où l'état en est.
+
+Il passe par OpenTofu, jamais par `oci compute instance launch` ni par
+l'interface web : une instance créée hors de l'état serait invisible pour
+`tofu`, qui en recréerait une deuxième. L'interface web n'aide pas non plus la
+capacité — elle appelle la même API et reçoit la même erreur.
+
+**Il lui faut un profil OCI à clé d'API**, pas à jeton de session : un jeton
+expire au bout d'une heure et ne se renouvelle pas sans navigateur, donc la
+boucle mourrait la nuit, précisément quand les vagues de capacité passent.
+
+    oci setup keys --key-name caffelatte_auto
+    oci iam user api-key upload --user-id <ocid de l'utilisateur> \
+      --key-file ~/.oci/caffelatte_auto_public.pem
+
+puis un profil `[CaffeLatteAuto]` dans `~/.oci/config` avec `user`, `fingerprint`,
+`tenancy`, `region` et `key_file`. La clé d'API est un secret de longue durée sur
+le portable : la supprimer une fois l'instance obtenue.
+
+## Ce qu'il faut attendre, honnêtement
+
+La capacité A1 gratuite à Montréal revient par vagues courtes, souvent la nuit,
+et elle part vite. Relancer à la main pendant une session de travail n'attrape
+rien — ceux qui l'obtiennent laissent une boucle tourner des jours. Le portable
+n'étant pas allumé en permanence, la boucle ne couvre que les heures où il
+tourne : c'est la limite acceptée, pas un défaut du script.
 
 ## Si Montréal ne donne rien
 
