@@ -30,8 +30,11 @@ variable "auth_oci" {
   # Doit suivre profil_oci : "SecurityToken" pour un profil a jeton de session,
   # "ApiKey" pour un profil a cle d'API. Un mode applique au mauvais type de
   # profil echoue en 401, la meme panne qui a coute la session du 2026-09-19.
+  # "InstancePrincipal" est le mode de la veilleuse : aucun profil, aucune cle
+  # sur la machine, l'identite vient de l'instance elle-meme. profil_oci est
+  # alors ignore par le provider.
   validation {
-    condition     = contains(["SecurityToken", "ApiKey"], var.auth_oci)
-    error_message = "auth_oci doit valoir SecurityToken ou ApiKey."
+    condition     = contains(["SecurityToken", "ApiKey", "InstancePrincipal"], var.auth_oci)
+    error_message = "auth_oci doit valoir SecurityToken, ApiKey ou InstancePrincipal."
   }
 }

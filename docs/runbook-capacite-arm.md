@@ -89,13 +89,95 @@ puis un profil `[CaffeLatteAuto]` dans `~/.oci/config` avec `user`, `fingerprint
 `tenancy`, `region` et `key_file`. La clé d'API est un secret de longue durée sur
 le portable : la supprimer une fois l'instance obtenue.
 
+## La veilleuse : la même boucle, sur une machine qui ne dort pas
+
+Le portable n'est pas allumé la nuit, précisément quand les vagues passent. La
+boucle tourne donc aussi sur une **micro x86 gratuite** (`VM.Standard.E2.1.Micro`,
+quota distinct de l'A1 — ce n'est PAS une deuxième A1), créée par le même
+`tofu apply` que le reste. Elle est **jetable** : la détruire et la relancer
+coûte deux minutes, d'où un amorçage entièrement en cloud-init
+(`terraform/cloud-init-veilleuse.yaml`), sans Ansible ni branche `deploy`.
+
+Le même script y tourne, avec trois variables posées par le service systemd :
+
+    OCI_AUTH=instance_principal    # aucune clé d'API sur la machine
+    CAFFELATTE_NOTIFIER=...        # publie sur le sujet ONS
+    CAFFELATTE_JOURNAL=...         # hors du dépôt cloné, qui est jetable
+
+**Elle s'authentifie en principal d'instance**, pas avec une clé déposée : rien
+à voler sur la machine, et l'accès se révoque en retirant la policy sans y
+toucher. La règle du groupe dynamique cible l'instance *précise*, donc l'A1
+n'hérite jamais de ces droits.
+
+**L'apply nocturne est ciblé** (`-target` sur l'A1 et son volume) : la veilleuse
+ne peut créer que ce pour quoi elle existe, même si le dépôt cloné contient
+autre chose. C'est le pendant du refus d'appliquer un arbre non commité, et ça
+évite qu'un refresh complet bute sur les ressources d'identité, que sa policy ne
+lui laisse pas lire. Après le succès, on reprend un `tofu apply` normal depuis
+le portable.
+
+### Les deux fichiers à déposer à la main, une seule fois
+
+`backend.hcl` contient la Customer Secret Key, qui ouvre le bucket d'état **et**
+celui des sauvegardes. Le mettre dans `user_data` la graverait dans l'état
+OpenTofu et dans la console OCI : elle se dépose donc hors bande. Le port 22
+étant fermé, le canal est **Compute → Instance → « Run Command »** dans la
+console (ou Cloud Shell, l'authentification y est déjà déléguée) :
+
+    sudo mkdir -p /etc/caffelatte
+    sudo tee /etc/caffelatte/backend.hcl >/dev/null <<'EOF'
+    ...contenu local de terraform/backend.hcl...
+    EOF
+    sudo tee /etc/caffelatte/terraform.tfvars >/dev/null <<'EOF'
+    ...contenu local de terraform/terraform.tfvars...
+    EOF
+    sudo chmod 600 /etc/caffelatte/backend.hcl
+
+Rien d'autre à faire : le service redémarre toutes les minutes et **sort en 0
+avec « EN ATTENTE » tant que les fichiers manquent** — l'attente elle-même, pas
+une panne, donc sans alerte. Dès qu'ils sont là, le démarrage suivant fait le
+`tofu init` et la veille commence. Vérifier :
+
+    sudo systemctl status caffelatte-veilleuse
+    sudo tail -f /var/lib/caffelatte/capacite-arm.log
+
+### Les courriels
+
+**Confirmer l'abonnement ONS** : OCI envoie un courriel de confirmation à la
+création et ne livre **rien** tant que le lien n'est pas cliqué. Tant que
+l'abonnement est `PENDING`, la veilleuse veille dans le vide.
+
+Trois courriels possibles :
+
+- **succès** — l'A1 existe ; suite ci-dessous ;
+- **arrêt** — sortie non nulle de la boucle, avec la fin du journal. Étranglé à
+  un par heure : le service redémarre à la minute, et une panne durable enverrait
+  autrement un courriel par minute ;
+- **battement hebdomadaire**, le lundi. Il n'est pas décoratif : une veilleuse
+  récupérée par Oracle pour inactivité s'arrête dans un silence parfait,
+  identique à celui d'une veille qui se passe bien. Le battement est le seul
+  moyen de distinguer « rien à signaler » de « plus personne n'écoute ». **S'il
+  cesse d'arriver, la veilleuse est morte** : la recréer par `tofu apply`.
+
+### Une fois l'A1 obtenue
+
+Le travail de la veilleuse est fini. La détruire — elle consomme une des deux
+micro gratuites et porte une copie de la Customer Secret Key :
+
+    tofu destroy -target=oci_core_instance.veilleuse \
+      -target=oci_identity_dynamic_group.veilleuse \
+      -target=oci_identity_policy.veilleuse
+
+Le sujet ONS et son abonnement, eux, se gardent : ils ne coûtent rien et
+serviront à la prochaine alerte.
+
 ## Ce qu'il faut attendre, honnêtement
 
 La capacité A1 gratuite à Montréal revient par vagues courtes, souvent la nuit,
 et elle part vite. Relancer à la main pendant une session de travail n'attrape
-rien — ceux qui l'obtiennent laissent une boucle tourner des jours. Le portable
-n'étant pas allumé en permanence, la boucle ne couvre que les heures où il
-tourne : c'est la limite acceptée, pas un défaut du script.
+rien — ceux qui l'obtiennent laissent une boucle tourner des jours. C'est
+exactement ce que la veilleuse répare : sur le portable seul, la boucle ne
+couvrait que les heures où il était allumé, et ratait donc les vagues de nuit.
 
 ## Si Montréal ne donne rien
 

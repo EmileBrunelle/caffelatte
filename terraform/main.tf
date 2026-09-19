@@ -310,3 +310,142 @@ resource "oci_budget_alert_rule" "prevision" {
   threshold_type = "ABSOLUTE"
   recipients     = var.alert_email
 }
+
+# ---------------------------------------------------------------------------
+# La veilleuse : une micro x86 gratuite dont le seul travail est d'attendre la
+# capacité ARM à notre place.
+#
+# La boucle d'attente vivait sur le portable, où elle mourait à chaque
+# fermeture de session — décision assumée tant qu'elle servait d'arrêt
+# automatique. Mais la capacité A1 revient par vagues courtes, souvent la nuit :
+# une boucle qui dort quand l'opérateur dort rate précisément les fenêtres
+# qu'elle est censée attraper.
+#
+# Cette instance-ci n'a AUCUNE des contraintes de l'A1 : les micro x86 ne sont
+# pas en pénurie, donc elle est JETABLE. La détruire et la relancer coûte deux
+# minutes et ne perd rien. C'est pourquoi tout son amorçage tient dans le
+# cloud-init, sans le piège du premier-démarrage-unique qui oblige l'A1 à
+# passer par Ansible.
+# ---------------------------------------------------------------------------
+
+# Résolue au lieu d'être passée en variable : une image x86 de plus à tenir à
+# jour dans un tfvars non versionné, pour une machine jetable, ne vaut pas la
+# saisie. `ignore_changes` plus bas empêche qu'une nouvelle image publiée par
+# Oracle propose de la recréer à chaque plan.
+data "oci_core_images" "x86" {
+  compartment_id           = var.compartment_id
+  operating_system         = "Oracle Linux"
+  operating_system_version = "10"
+  shape                    = "VM.Standard.E2.1.Micro"
+  sort_by                  = "TIMECREATED"
+  sort_order               = "DESC"
+}
+
+resource "oci_core_instance" "veilleuse" {
+  compartment_id      = var.compartment_id
+  availability_domain = var.availability_domain
+  shape               = "VM.Standard.E2.1.Micro" # x86 Always Free, quota distinct de l'A1
+  display_name        = "veilleuse"
+
+  source_details {
+    source_type = "image"
+    source_id   = data.oci_core_images.x86.images[0].id
+    # 47 Go, le défaut. Avec les 50 du volume de démarrage A1 et les 50 du
+    # volume de données, on est à 147 des 200 Go gratuits du tenancy.
+    boot_volume_size_in_gbs = 47
+  }
+
+  create_vnic_details {
+    subnet_id = oci_core_subnet.public.id
+    # Aucun port entrant n'est nécessaire : la veilleuse ne fait que du sortant
+    # sur 443. Elle hérite de la Security List du subnet, qui n'ouvre pas le 22.
+    assign_ipv6ip = true
+  }
+
+  metadata = {
+    ssh_authorized_keys = var.ssh_public_key
+    user_data = base64encode(templatefile("${path.module}/cloud-init-veilleuse.yaml", {
+      topic_ocid = oci_ons_notification_topic.alertes.topic_id
+    }))
+  }
+
+  # Même durcissement que l'A1, et ici sans aucun enjeu : la machine est
+  # jetable, donc un ForceNew ne coûte rien.
+  is_pv_encryption_in_transit_enabled = true
+
+  instance_options {
+    are_legacy_imds_endpoints_disabled = true
+  }
+
+  agent_config {
+    is_monitoring_disabled = false
+    is_management_disabled = false
+
+    plugins_config {
+      # Le canal de bris de glace : c'est par lui qu'on dépose le backend.hcl au
+      # premier démarrage, faute de port 22. Voir docs/runbook-capacite-arm.md.
+      name          = "Compute Instance Run Command"
+      desired_state = "ENABLED"
+    }
+    plugins_config {
+      name          = "Compute Instance Monitoring"
+      desired_state = "ENABLED"
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [source_details[0].source_id]
+  }
+}
+
+# La veilleuse s'authentifie en PRINCIPAL D'INSTANCE : aucune clé d'API n'est
+# déposée sur la machine, et l'accès se révoque en retirant la policy, sans
+# toucher à la machine. La règle cible l'instance PRÉCISE, pas le compartiment,
+# pour que l'A1 n'hérite jamais de ces droits.
+resource "oci_identity_dynamic_group" "veilleuse" {
+  compartment_id = var.tenancy_ocid # les groupes dynamiques vivent dans le tenancy
+  name           = "caffelatte-veilleuse"
+  description    = "La micro x86 qui attend la capacité ARM"
+  matching_rule  = "ALL {instance.id = '${oci_core_instance.veilleuse.id}'}"
+}
+
+resource "oci_identity_policy" "veilleuse" {
+  compartment_id = var.tenancy_ocid
+  name           = "caffelatte-veilleuse"
+  description    = "Ce que la veilleuse a le droit de faire, et rien de plus"
+
+  # `manage instance-family` est large, et c'est irréductible : le travail de
+  # cette machine EST de créer une instance. Le périmètre est donc resserré
+  # ailleurs — un seul compartiment, une seule instance dans le groupe.
+  statements = [
+    "Allow dynamic-group ${oci_identity_dynamic_group.veilleuse.name} to manage compute-capacity-reports in compartment id ${var.compartment_id}",
+    "Allow dynamic-group ${oci_identity_dynamic_group.veilleuse.name} to manage instance-family in compartment id ${var.compartment_id}",
+    "Allow dynamic-group ${oci_identity_dynamic_group.veilleuse.name} to use volume-family in compartment id ${var.compartment_id}",
+    "Allow dynamic-group ${oci_identity_dynamic_group.veilleuse.name} to use virtual-network-family in compartment id ${var.compartment_id}",
+    "Allow dynamic-group ${oci_identity_dynamic_group.veilleuse.name} to use ons-topics in compartment id ${var.compartment_id}",
+  ]
+}
+
+# Notifications : le service gratuit d'OCI, pas un envoi SMTP. Le port 25 sortant
+# est bloqué chez OCI de toute façon, et Email Delivery demanderait un domaine
+# vérifié pour le même résultat.
+resource "oci_ons_notification_topic" "alertes" {
+  compartment_id = var.compartment_id
+  name           = "caffelatte-alertes"
+  description    = "Capacité ARM obtenue, échec de la veilleuse, battement de cœur"
+}
+
+resource "oci_ons_subscription" "courriel" {
+  compartment_id = var.compartment_id
+  topic_id       = oci_ons_notification_topic.alertes.topic_id
+  protocol       = "EMAIL"
+  endpoint       = var.alert_email
+
+  # OCI envoie un courriel de confirmation ; tant que le lien n'est pas cliqué
+  # l'abonnement reste « PENDING » et RIEN n'est livré. L'état est donc géré
+  # hors d’OpenTofu, d’où l’ignore : sinon chaque plan proposerait de le
+  # remettre à PENDING.
+  lifecycle {
+    ignore_changes = [defined_tags, freeform_tags]
+  }
+}

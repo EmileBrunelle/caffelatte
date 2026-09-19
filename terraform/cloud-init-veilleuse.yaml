@@ -1,0 +1,145 @@
+#cloud-config
+# Amorçage de la veilleuse — la micro x86 qui attend la capacité ARM.
+#
+# Contrairement à cloud-init.yaml, qui amorce l'A1, ce fichier-ci peut TOUT
+# faire : la veilleuse est jetable. Le piège du « user_data lu au premier
+# démarrage seulement » n'en est pas un ici — recréer la machine coûte deux
+# minutes et ne perd rien. Donc pas d'ansible-pull, pas de branche deploy : ce
+# qui suit est l'intégralité de la configuration.
+#
+# CE QUI N'EST PAS ICI, ET DÉLIBÉRÉMENT : backend.hcl et terraform.tfvars. Le
+# premier contient la Customer Secret Key, qui ouvre le bucket d'état ET celui
+# des sauvegardes. La mettre dans user_data la graverait dans l'état OpenTofu
+# et dans la console OCI. Elle se dépose donc à la main, une fois, par « Run
+# Command » depuis la console — voir docs/runbook-capacite-arm.md. Le service
+# redémarre en boucle tant qu'elle manque, et démarre tout seul dès qu'elle est
+# là.
+
+package_update: true
+packages:
+  - git
+  - jq
+
+write_files:
+  # L'OCID du sujet de notification, injecté par templatefile. Pas un secret :
+  # publier dessus exige la policy du groupe dynamique.
+  - path: /etc/caffelatte/topic
+    permissions: "0644"
+    content: |
+      ${topic_ocid}
+
+  - path: /usr/local/sbin/caffelatte-notifier
+    permissions: "0755"
+    owner: root:root
+    content: |
+      #!/bin/bash
+      # Publie un message sur le sujet ONS. Aucune clé : principal d'instance.
+      set -u
+      SUJET="$${1:?sujet manquant}"
+      CORPS="$${2:?corps manquant}"
+      exec oci ons message publish \
+        --auth instance_principal \
+        --topic-id "$(cat /etc/caffelatte/topic)" \
+        --title "$${SUJET}" \
+        --body "$${CORPS}"
+
+  - path: /usr/local/sbin/caffelatte-battement
+    permissions: "0755"
+    owner: root:root
+    content: |
+      #!/bin/bash
+      # Battement de cœur hebdomadaire. Sans lui, une veilleuse récupérée par
+      # Oracle pour inactivité s'arrête dans un silence parfait : la boucle
+      # d'attente et la boucle morte produisent exactement la même absence de
+      # courriel. C'est le seul moyen de distinguer « rien à signaler » de
+      # « plus personne n'écoute ».
+      set -u
+      DERNIERE=$(tail -1 /var/lib/caffelatte/capacite-arm.log 2>/dev/null || echo "journal vide")
+      if systemctl is-active --quiet caffelatte-veilleuse; then
+        ETAT="en veille, tout va bien"
+      else
+        ETAT="ARRÊTÉE — le service ne tourne plus, il faut regarder"
+      fi
+      /usr/local/sbin/caffelatte-notifier \
+        "caffelatte : battement hebdomadaire ($${ETAT})" \
+        "La veilleuse est $${ETAT}.
+
+      Dernière ligne du journal :
+      $${DERNIERE}
+
+      Ce courriel part tous les lundis. S'il cesse d'arriver, la veilleuse a
+      probablement été récupérée par Oracle pour inactivité : la recréer avec
+      un tofu apply."
+
+  - path: /etc/systemd/system/caffelatte-veilleuse.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=Attend la capacité ARM et crée l'instance A1
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      # Le script refuse de démarrer tant que backend.hcl n'est pas déposé.
+      # Redémarrer en boucle EST le mécanisme d'attente : rien à relancer à la
+      # main une fois le fichier en place.
+      Restart=always
+      RestartSec=60
+      WorkingDirectory=/opt/caffelatte
+      Environment=OCI_AUTH=instance_principal
+      Environment=CAFFELATTE_NOTIFIER=/usr/local/sbin/caffelatte-notifier
+      Environment=CAFFELATTE_JOURNAL=/var/lib/caffelatte/capacite-arm.log
+      ExecStart=/opt/caffelatte/scripts/attendre-capacite-arm.sh
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/systemd/system/caffelatte-battement.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=Battement de cœur hebdomadaire de la veilleuse
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/caffelatte-battement
+
+  - path: /etc/systemd/system/caffelatte-battement.timer
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=Battement de cœur hebdomadaire de la veilleuse
+
+      [Timer]
+      OnCalendar=Mon *-*-* 09:00:00
+      # Le battement doit partir même si la machine dormait à l'heure dite,
+      # sinon un redémarrage le saute et l'absence de courriel ment.
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+
+runcmd:
+  - mkdir -p /var/lib/caffelatte /etc/caffelatte
+
+  # OpenTofu, jamais Terraform (ADR 0011). Le script d'installation officiel
+  # pose le dépôt RPM signé, ce qui rend les mises à jour ordinaires via dnf.
+  - curl -fsSL https://get.opentofu.org/install-opentofu.sh -o /tmp/install-opentofu.sh
+  - chmod +x /tmp/install-opentofu.sh
+  - /tmp/install-opentofu.sh --install-method rpm
+  - rm -f /tmp/install-opentofu.sh
+
+  # Le CLI OCI, pour la sonde de capacité et pour publier les notifications.
+  - dnf install -y oci-cli || pip3 install --quiet oci-cli
+
+  # Le dépôt est public : aucun jeton. Figé au clone — la veilleuse ne se met
+  # PAS à jour toute seule, précisément pour qu'un commit sur main ne change
+  # jamais ce qu'elle est en train d'appliquer.
+  - git clone --depth 1 https://github.com/EmileBrunelle/caffelatte.git /opt/caffelatte
+  - ln -sf /etc/caffelatte/backend.hcl /opt/caffelatte/terraform/backend.hcl
+  - ln -sf /etc/caffelatte/terraform.tfvars /opt/caffelatte/terraform/terraform.tfvars
+
+  - systemctl daemon-reload
+  - systemctl enable --now caffelatte-battement.timer
+  - systemctl enable --now caffelatte-veilleuse.service
