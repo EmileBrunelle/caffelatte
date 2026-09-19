@@ -3,6 +3,10 @@ svc_uid: 1001
 # Pilote systemd --user de l'utilisateur svc depuis une tâche root.
 svc_systemctl: >-
   runuser -u svc -- env XDG_RUNTIME_DIR=/run/user/{{ svc_uid }} systemctl --user
+# Même chose pour podman : les conteneurs sont rootless, ils n'existent que
+# dans le stockage de svc. Un « podman » lancé en root ne verrait rien.
+svc_podman: >-
+  runuser -u svc -- env XDG_RUNTIME_DIR=/run/user/{{ svc_uid }} podman
 
 minecraft_version: "1.21.8"   # bumper ici : l'image se rebuild, les joueurs sont avertis
 # 5-10 joueurs : 4 Go de tas est large. Plus gros ne va PAS plus vite — ça
@@ -15,7 +19,16 @@ minecraft_simulation_distance: 6
 # Rayon pré-généré par Chunky. Au-delà, le joueur attend la génération —
 # c'est ce qui fait chuter le TPS sur 2 OCPU.
 minecraft_border_radius: 5000
-maintenance_warn_minutes: [15, 5, 1]
+# Plafond d'attente de mc-maintenance.sh entre le signal envoyé à Gate et le
+# fichier témoin qui confirme que les joueurs sont sortis. Doit dépasser le
+# préavis le plus long de Gate (maintenance.Warnings, 5 min) avec de la marge.
+# Passé ce délai le script ABANDONNE la mise à jour plutôt que de déconnecter
+# des joueurs qu'on venait de promettre de prévenir.
+#
+# Les paliers d'avertissement eux-mêmes ne sont PAS ici : ils vivent dans
+# maintenance.Warnings côté Go, seul endroit qui les applique. Une variable
+# Ansible que personne ne lit ne ferait que mentir au prochain lecteur.
+maintenance_attente_max_secondes: 480
 
 # Mise en veille du serveur quand il est vide. Gate garde le port, démarre le
 # backend à la première connexion, l'arrête après N minutes sans joueur.

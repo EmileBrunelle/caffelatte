@@ -3,10 +3,13 @@ package maintenance
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
 	"golang.org/x/text/language"
 )
 
@@ -154,5 +157,30 @@ func TestDormirAnnulé(t *testing.T) {
 	}
 	if !dormir(context.Background(), 0) {
 		t.Error("dormir(0) devrait rendre true sans annulation")
+	}
+}
+
+// Le témoin est le seul lien entre Gate et l'hôte : si poser/retirer se
+// désynchronise, l'hôte met à jour pendant que des joueurs sont connectés, ou
+// n'y va jamais. Retirer doit être idempotent — c'est appelé au démarrage,
+// quand le fichier n'existe presque jamais.
+func TestTémoinPoséPuisRetiré(t *testing.T) {
+	ÉtatPath = filepath.Join(t.TempDir(), "etat")
+	pl := &plugin{log: logr.Discard()}
+
+	pl.retirerTémoin() // absent : ne doit ni paniquer ni journaliser une erreur
+
+	pl.poserTémoin(Window{StartsAt: time.Now(), Raison: RaisonHôte})
+	contenu, err := os.ReadFile(ÉtatPath)
+	if err != nil {
+		t.Fatalf("témoin non posé : %v", err)
+	}
+	if !strings.HasPrefix(string(contenu), string(RaisonHôte)) {
+		t.Errorf("le témoin doit nommer la raison, il contient %q", contenu)
+	}
+
+	pl.retirerTémoin()
+	if _, err := os.Stat(ÉtatPath); !os.IsNotExist(err) {
+		t.Errorf("témoin encore là après retrait : %v", err)
 	}
 }

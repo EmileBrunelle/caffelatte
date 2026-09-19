@@ -1,0 +1,15 @@
+[Unit]
+Description=Mise à jour quotidienne des conteneurs de jeu
+
+[Timer]
+# 05:00, avant la sauvegarde de 05:30 : si la mise à jour casse quelque chose,
+# la sauvegarde qui suit capture l'état d'après et non celui d'avant. C'est le
+# mauvais sens — mais l'inverse (sauvegarder puis mettre à jour) ferait tourner
+# restic pendant que les conteneurs redémarrent. À revoir quand la
+# restauration sera testée pour de vrai.
+OnCalendar=*-*-* 05:00:00
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target

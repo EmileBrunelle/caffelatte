@@ -1,0 +1,63 @@
+#!/bin/bash
+# Encadre une mise à jour d'un avertissement en jeu.
+#
+#   mc-maintenance.sh conteneur podman auto-update
+#   mc-maintenance.sh hote      systemctl reboot
+#
+# Déroulé : signaler Gate → attendre que Gate ait sorti les joueurs →
+# exécuter la commande → renvoyer le même signal pour lever la maintenance.
+#
+# Pourquoi un fichier témoin et pas un simple « sleep 5m » : quand personne
+# n'est connecté, Gate applique la fenêtre IMMÉDIATEMENT (pas de préavis à
+# donner à une salle vide). Attendre à l'aveugle ferait perdre cinq minutes à
+# chaque mise à jour nocturne, et serait faux le jour où les paliers changent.
+# Gate reste seul juge du moment où les joueurs sont dehors.
+set -euo pipefail
+
+TEMOIN=/home/svc/maintenance/etat
+# Plafond d'attente : le préavis le plus long de Gate, plus une marge. Si le
+# témoin n'est pas là au bout de ça, Gate ne répond pas comme prévu.
+ATTENTE_MAX={{ maintenance_attente_max_secondes | default(480) }}
+
+case "${1:-}" in
+  conteneur) SIGNAL=USR1 ;;
+  hote)      SIGNAL=USR2 ;;
+  *) echo "usage: $0 {conteneur|hote} <commande...>" >&2; exit 2 ;;
+esac
+shift
+[[ $# -gt 0 ]] || { echo "aucune commande à exécuter" >&2; exit 2; }
+
+svc_podman() { {{ svc_podman }} "$@"; }
+
+signaler() { svc_podman kill --signal "$SIGNAL" gate; }
+
+# Rend 0 dès que Gate a posé le témoin, 1 si le plafond est atteint.
+attendre_les_joueurs() {
+  local fin=$((SECONDS + ATTENTE_MAX))
+  until [[ -e "$TEMOIN" ]]; do
+    (( SECONDS < fin )) || return 1
+    sleep 5
+  done
+}
+
+signaler
+if ! attendre_les_joueurs; then
+  # On NE met PAS à jour. Gate est vivant (il a accepté le signal) mais n'a
+  # pas confirmé que les joueurs sont sortis : passer outre déconnecterait
+  # des gens qu'on vient justement de promettre de prévenir. Le seul coût de
+  # l'abandon est un redémarrage reporté au prochain déclenchement du timer,
+  # et dnf-automatic a déjà appliqué les paquets de toute façon.
+  echo "témoin absent après ${ATTENTE_MAX}s — mise à jour abandonnée" >&2
+  signaler   # lever la fenêtre : inutile de laisser le MOTD en maintenance
+  exit 1
+fi
+
+# À partir d'ici le serveur est vide et le MOTD affiche la maintenance.
+statut=0
+"$@" || statut=$?
+
+# Cas du redémarrage de l'hôte : la machine part avant cette ligne et la
+# maintenance n'est jamais levée ici. C'est prévu — Gate retire le témoin à son
+# propre démarrage, et sa fenêtre ne survit pas au redémarrage.
+signaler   # lève la maintenance et retire le témoin
+exit "$statut"

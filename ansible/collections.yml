@@ -1,0 +1,18 @@
+# Installe les collections déclarées à la racine. Importé en pre_tasks par
+# CHAQUE play : les deux hôtes passent par le rôle base, donc les deux ont
+# besoin d'ansible.posix.firewalld.
+#
+# Sur le CONTRÔLEUR et pas sur la cible : une collection est du code Ansible,
+# elle s'exécute là où tourne le playbook. become: false pour l'installer sous
+# l'utilisateur qui lance effectivement ansible, dont c'est le ~/.ansible.
+#
+# Sans ça le déploiement mourait à la première tâche firewalld. La CI ne fait
+# que linter — elle n'exécute jamais le playbook — donc elle restait verte et
+# le trou ne se serait vu qu'en production.
+- name: Collections requises
+  ansible.builtin.command: >-
+    ansible-galaxy collection install -r {{ playbook_dir }}/../requirements.yml
+  delegate_to: localhost
+  become: false
+  run_once: true
+  changed_when: false

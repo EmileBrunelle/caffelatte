@@ -59,6 +59,42 @@ var Warnings = []time.Duration{5 * time.Minute, 2 * time.Minute, time.Minute}
 // de la taille du monde et du nombre de mods. À ajuster sur la mesure.
 var RetourAprès = 5 * time.Minute
 
+// ÉtatPath est le fichier témoin par lequel Gate dit à l'hôte « les joueurs
+// sont dehors, tu peux y aller ». Sans lui l'hôte n'a aucun moyen de le
+// savoir : Gate n'a ni console ni port d'administration, et le signal qui
+// ouvre la fenêtre ne dit pas quand elle prend effet.
+//
+// Le contrat est l'EXISTENCE du fichier, jamais son contenu : l'hôte fait un
+// « test -e » en boucle, donc aucune écriture partielle ne peut le tromper.
+// Le contenu n'est là que pour l'humain qui débogue.
+//
+// Monté en bind depuis l'hôte (Volume= dans gate.container) et pas dans le
+// volume gate-data : un volume podman nommé et rootless oblige l'hôte à faire
+// un « podman volume inspect » pour retrouver son _data.
+var ÉtatPath = "/run/maintenance/etat"
+
+// poserTémoin marque la maintenance comme EN VIGUEUR. Appelé après la
+// déconnexion des joueurs, jamais avant : le fichier signifie « plus personne
+// n'est connecté », pas « une fenêtre est ouverte ».
+func (pl *plugin) poserTémoin(w Window) {
+	contenu := fmt.Sprintf("%s\n%s\n", w.Raison, time.Now().Format(time.RFC3339))
+	if err := os.WriteFile(ÉtatPath, []byte(contenu), 0o644); err != nil {
+		// Non fatal : les joueurs sont déjà sortis, la maintenance a bien eu
+		// lieu. Seul l'hôte reste dans le noir — il expirera plutôt que de
+		// mettre à jour sous les pieds de personne.
+		pl.log.Error(err, "témoin de maintenance non écrit", "chemin", ÉtatPath)
+	}
+}
+
+// retirerTémoin annonce la fin de la maintenance. Aussi appelé au démarrage :
+// un Gate qui redémarre a perdu sa fenêtre en mémoire mais pas le fichier sur
+// disque, et un témoin périmé dirait « vas-y » à l'hôte pour toujours.
+func (pl *plugin) retirerTémoin() {
+	if err := os.Remove(ÉtatPath); err != nil && !os.IsNotExist(err) {
+		pl.log.Error(err, "témoin de maintenance non retiré", "chemin", ÉtatPath)
+	}
+}
+
 // La mise en veille et la fenêtre de maintenance sont le MÊME problème : dans
 // les deux cas le backend est absent et Gate tient la connexion. La différence
 // tient à ce qui met fin à l'absence — un redémarrage terminé, ou un joueur qui
@@ -217,6 +253,8 @@ func Register() {
 		Init: func(ctx context.Context, p *proxy.Proxy) error {
 			pl := &plugin{proxy: p, log: logr.FromContextOrDiscard(ctx).WithName("maintenance")}
 
+			pl.retirerTémoin()
+
 			event.Subscribe(p.Event(), 0, pl.auPing)
 			event.Subscribe(p.Event(), 0, pl.auPostLogin)
 			go pl.écouterSignaux(ctx)
@@ -265,6 +303,7 @@ func (pl *plugin) basculer(ctx context.Context, r Raison) {
 			annuler()
 		}
 		if commencée {
+			pl.retirerTémoin()
 			pl.log.Info("maintenance levée")
 		} else {
 			pl.log.Info("fenêtre annulée", "raison", w.Raison)
@@ -318,6 +357,7 @@ func (pl *plugin) compteÀRebours(ctx context.Context, w Window) {
 	for _, j := range pl.proxy.Players() {
 		handleDuringOutage(j, w)
 	}
+	pl.poserTémoin(w)
 }
 
 // dormir attend d, ou rend false si la fenêtre est annulée entre-temps.

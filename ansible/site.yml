@@ -1,6 +1,9 @@
 - name: Hôte ARM — socle durci et pile de jeu
   hosts: arm
   become: true
+  pre_tasks:
+    - name: Collections requises
+      ansible.builtin.import_tasks: collections.yml
   roles:
     - base
     - minecraft
@@ -8,5 +11,8 @@
 - name: Hôte edge — socle durci
   hosts: edge
   become: true
+  pre_tasks:
+    - name: Collections requises
+      ansible.builtin.import_tasks: collections.yml
   roles:
     - base

@@ -1,0 +1,10 @@
+[Unit]
+Description=Mise à jour des conteneurs de jeu, joueurs avertis
+
+[Service]
+Type=oneshot
+# podman-auto-update.timer natif fait la même chose SANS préavis : il tire la
+# nouvelle image et redémarre sous les pieds des joueurs. On passe par le
+# script, qui laisse à Gate le temps de compter à rebours et de sortir tout le
+# monde proprement. Le timer natif est désactivé sur cet hôte (rôle minecraft).
+ExecStart=/usr/local/sbin/mc-maintenance.sh conteneur {{ svc_podman }} auto-update

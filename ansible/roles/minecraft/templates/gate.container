@@ -17,6 +17,11 @@ Secret=floodgate_key
 # lui donner un accès en écriture aux données de jeu est exactement ce qu'on
 # évite. La racine reste en lecture seule, ce volume est le seul point d'écriture.
 Volume=gate-data.volume:/var/lib/gate:U,Z
+# Témoin de maintenance : Gate y écrit quand les joueurs sont sortis, et
+# mc-maintenance.sh sur l'hôte attend ce fichier avant de mettre à jour. Bind
+# depuis l'hôte et pas dans gate-data : un volume podman nommé et rootless
+# obligerait le script à faire un « podman volume inspect » pour trouver _data.
+Volume=%h/maintenance:/run/maintenance:Z
 # Config du plugin d'invitation. Elle passe par l'environnement et non par
 # config.yml : Gate redésérialise son fichier dans sa propre struct et jette
 # toute clé inconnue (pkg/gate/gate.go, fixedReadInConfig) — un plugin embarqué

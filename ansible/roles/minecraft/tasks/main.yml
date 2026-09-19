@@ -33,6 +33,46 @@
   # Gate surveille ce fichier et recharge à chaud : pas de notify, pas de
   # redémarrage, personne n'est déconnecté.
 
+- name: Répertoire du témoin de maintenance
+  # Gate (rootless, uid svc) y écrit ; le script de mise à jour, lui, tourne en
+  # root et se contente de lire.
+  ansible.builtin.file:
+    path: /home/svc/maintenance
+    state: directory
+    owner: svc
+    group: svc
+    mode: "0755"
+
+- name: Script de maintenance encadrant les mises à jour
+  ansible.builtin.template:
+    src: mc-maintenance.sh.j2
+    dest: /usr/local/sbin/mc-maintenance.sh
+    owner: root
+    mode: "0750"
+
+- name: Unités de mise à jour encadrée
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    mode: "0644"
+  loop: [mc-update.service, mc-update.timer]
+
+- name: Désactiver l'auto-update podman natif sur l'hôte de jeu
+  # Unité UTILISATEUR, activée par le rôle base : elle tire les images et
+  # redémarre les conteneurs SANS préavis, court-circuitant exactement la
+  # fenêtre de maintenance. L'hôte edge la garde, il n'a pas de joueurs à
+  # ménager. Pilotée par runuser comme les autres unités de svc.
+  ansible.builtin.command: "{{ svc_systemctl }} disable --now podman-auto-update.timer"
+  changed_when: false
+
+- name: Activer la mise à jour encadrée
+  ansible.builtin.systemd_service:
+    name: mc-update.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
 - name: Config Geyser
   ansible.builtin.template:
     src: geyser.yml.j2
