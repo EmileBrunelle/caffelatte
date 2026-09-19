@@ -1,6 +1,9 @@
 [Unit]
-Description=Réseau interne Minecraft — aucun port backend sur l'hôte
+Description=Réseau backend Minecraft — aucune sortie Internet
 
 [Network]
 NetworkName=mc
-Internal=false
+# Internal=true : pas de route par défaut, pas de NAT sortant. Le serveur de jeu
+# n'a besoin de parler à personne d'autre que Gate ; lui retirer l'egress ferme
+# l'exfiltration et le rappel de charge utile si un mod ou un exploit passe.
+Internal=true

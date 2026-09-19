@@ -12,13 +12,25 @@ Secret=rcon_password
 Secret=forwarding_secret
 Environment=HEAP={{ minecraft_heap }}
 Environment=ONLINE_MODE=false
+Environment=VIEW_DISTANCE={{ minecraft_view_distance }}
+Environment=SIMULATION_DISTANCE={{ minecraft_simulation_distance }}
 AutoUpdate=registry
 NoNewPrivileges=true
 DropCapability=ALL
+# Racine en lecture seule : l'état vit dans /data, le reste ne doit pas bouger.
+ReadOnly=true
+Tmpfs=/tmp:rw,noexec,nosuid,size=256M
+SecurityLabelType=container_t
+PodmanArgs=--memory=5g --pids-limit=512
 
 [Service]
 Restart=always
 TimeoutStopSec=120
+# 2 OCPU partagés avec Forgejo, Grafana et compagnie. Le thread de tick de
+# Minecraft doit gagner la contention, sinon le TPS chute quand une sauvegarde
+# ou un build Forgejo démarre. CPUWeight est relatif : défaut 100.
+CPUWeight=800
+IOWeight=800
 
 [Install]
 WantedBy=default.target

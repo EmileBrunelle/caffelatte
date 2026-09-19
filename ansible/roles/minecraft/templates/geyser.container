@@ -13,6 +13,7 @@ NoNewPrivileges=true
 
 [Service]
 Restart=always
+CPUWeight=200
 
 [Install]
 WantedBy=default.target

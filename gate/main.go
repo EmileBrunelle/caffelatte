@@ -9,7 +9,7 @@ package main
 import (
 	"go.minekube.com/gate/cmd/gate"
 
-	"github.com/OWNER/caffelatte/gate/internal/maintenance"
+	"github.com/caffelatte/caffelatte/gate/internal/maintenance"
 )
 
 func main() {

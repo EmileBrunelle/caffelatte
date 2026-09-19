@@ -1,3 +1,6 @@
+- name: Durcissement
+  ansible.builtin.import_tasks: securite.yml
+
 # Socle commun ARM + x86 : podman rootless, mises à jour auto, pare-feu.
 - name: Paquets de base
   ansible.builtin.dnf:

@@ -4,7 +4,7 @@ FROM docker.io/library/eclipse-temurin:21-jdk AS build
 ARG MC_VERSION=1.21.8
 ARG FABRIC_INSTALLER=1.0.3
 # Mods serveur-only : ne changent AUCUN comportement de jeu, seulement la perf.
-ARG MODS="lithium ferrite-core krypton fabricproxy-lite"
+ARG MODS="lithium ferrite-core krypton fabricproxy-lite chunky"
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl jq && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
@@ -29,7 +29,7 @@ RUN arch=$(dpkg --print-architecture) \
     | tar xz rcon-cli
 
 FROM docker.io/library/eclipse-temurin:21-jre
-LABEL org.opencontainers.image.source="https://github.com/OWNER/caffelatte"
+LABEL org.opencontainers.image.source="https://github.com/caffelatte/caffelatte"
 # Auto-update natif de Podman : `podman auto-update` suit le registre.
 LABEL io.containers.autoupdate=registry
 

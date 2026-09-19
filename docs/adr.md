@@ -84,3 +84,21 @@ sert à rien. Le coût du second dépôt est de quelques dollars par mois au plu
 pour ce volume — c'est l'assurance contre le scénario qui a motivé le projet.
 **À vérifier :** la restauration, pas la sauvegarde. Un exercice trimestriel,
 noté dans `docs/runbook-restore.md`.
+
+## 0007 — Terraform pour le provisionnement OCI, Ansible pour la configuration
+**Décidé :** Terraform ne crée que les ressources qui ont une API chez Oracle —
+VCN, Security Lists, instances, bucket, IAM. Ansible configure tout ce qui tourne
+à l'intérieur. La frontière est nette et rien ne la traverse.
+**Pourquoi :** c'est la Security List qui justifie l'outil, pas l'instance. Une
+règle réseau posée à la main dans la console ne se relit pas, ne se révise pas,
+et se perd. C'est aussi la couche où une erreur ouvre un port sur Internet.
+**La nuance qui compte :** la couche Terraform est la partie *jetable* du projet.
+Elle est spécifique à OCI ; si Oracle disparaît, elle est à réécrire. La couche
+Ansible, elle, est portable vers n'importe quel hôte Enterprise Linux. C'est
+pourquoi la frontière est là et pas ailleurs — on isole ce qui est prisonnier
+du fournisseur.
+**Écarté :** tout en Ansible via le module `oracle.oci` (mélange création et
+configuration, pas de plan, pas de suppression fiable) ; console à la main (une
+vingtaine de minutes, mais irreproductible — or « reconstruire ailleurs » est
+l'exigence qui a lancé le projet) ; Terraform aussi pour les conteneurs (le
+provider Podman existe et ne vaut rien face à Quadlet).

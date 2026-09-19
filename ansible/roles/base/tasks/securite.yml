@@ -1,0 +1,50 @@
+# Durcissement du socle. Ce qui n'est pas ici est déjà porté par la conception :
+# rootless, DropCapability=ALL, racine en lecture seule, backend sans egress,
+# secrets sur tmpfs, SELinux enforcing (défaut Oracle Linux 10, on ne le touche pas).
+
+- name: SSH — clés seulement, pas de root
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/10-durcissement.conf
+    mode: "0600"
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin no
+      AllowUsers {{ ansible_user }}
+  notify: restart sshd
+
+- name: Pare-feu — uniquement ce qui doit être joignable
+  ansible.posix.firewalld:
+    port: "{{ item }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop:
+    - 25565/tcp   # Minecraft Java -> Gate
+    - 19132/udp   # Minecraft Bedrock -> Geyser
+    - 443/tcp     # HTTPS (hôte edge seulement)
+  # Non listés, donc fermés : 25575 (RCON) et 25566+ (backends). Ils ne sont
+  # joignables que par le réseau `mc`, jamais depuis l'hôte ni l'extérieur.
+
+- name: Pare-feu — SSH retiré du public (accès par OCI Bastion)
+  ansible.posix.firewalld:
+    service: ssh
+    permanent: true
+    immediate: true
+    state: disabled
+  when: use_oci_bastion | default(false)
+
+# RAPPEL : le pare-feu OCI (Security List / NSG du VCN) est une couche SÉPARÉE.
+# Les deux doivent autoriser le port. Un port ouvert dans firewalld mais absent
+# de la Security List donne un timeout silencieux — la perte de temps classique.
+
+- name: Pas de core dumps (ils contiennent des secrets en mémoire)
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-durcissement.conf
+    mode: "0644"
+    content: |
+      kernel.core_pattern=|/bin/false
+      kernel.kptr_restrict=2
+      kernel.dmesg_restrict=1
+      net.ipv4.conf.all.log_martians=1
+  notify: reload sysctl

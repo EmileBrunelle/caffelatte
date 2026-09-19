@@ -6,15 +6,20 @@ After=mc-network.service
 Image=ghcr.io/{{ github_org }}/gate:latest
 ContainerName=gate
 Network=mc.network
+# Second réseau : Gate a besoin de l'egress pour l'auth Mojang.
+Network=podman
 PublishPort=25565:25565/tcp
 Volume=%h/.config/gate:/etc/gate:ro,Z
 Secret=forwarding_secret
 AutoUpdate=registry
 NoNewPrivileges=true
 DropCapability=ALL
+ReadOnly=true
+Tmpfs=/tmp:rw,noexec,nosuid,size=64M
 
 [Service]
 Restart=always
+CPUWeight=200
 
 [Install]
 WantedBy=default.target

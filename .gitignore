@@ -4,3 +4,6 @@ ansible/inventory.yml
 *.agekey
 keys.txt
 *.retry
+*.tfvars
+.terraform/
+*.tfstate*
