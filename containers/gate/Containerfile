@@ -1,0 +1,13 @@
+# Binaire Gate maison : Gate standard plus le plugin de fenêtre de maintenance.
+FROM docker.io/library/golang:1.24 AS build
+WORKDIR /src
+COPY gate/go.mod gate/go.sum* ./
+RUN go mod download
+COPY gate/ ./
+RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /gate .
+
+FROM gcr.io/distroless/static-debian12:nonroot
+LABEL io.containers.autoupdate=registry
+COPY --from=build /gate /gate
+EXPOSE 25565
+ENTRYPOINT ["/gate"]
