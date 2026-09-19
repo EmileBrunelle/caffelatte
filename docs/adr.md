@@ -198,6 +198,15 @@ toujours pas d'ici, le blocage étant sortant).
 **Conséquences à ne pas oublier :**
 - `ansible-pull` tirera d'une branche `deploy`, jamais de `main` — le dépôt est
   public, une poussée irait droit en production.
+- **GitHub n'est PAS concerné par le blocage du 22.** `ssh.github.com` écoute sur
+  le **443** ; `~/.ssh/config` redirige déjà `github.com` vers lui, et
+  `ssh -T git@github.com` répond. Donc `git push` en SSH fonctionne d'ici, et
+  `origin` reste en SSH. Le blocage du 22 vaut pour OCI Bastion, dont l'endpoint
+  n'offre aucune alternative sur 443 — c'est ce qui le rend inutilisable, pas une
+  impossibilité générale de faire du SSH depuis ce réseau. Basculer `origin` en
+  HTTPS « pour contourner » est une fausse bonne idée : le jeton OAuth de `gh`
+  refuse alors de pousser toute modification de `.github/workflows/`, faute de
+  portée `workflow`. Essayé le 2026-09-19, annulé.
 - **La console série exige une clé RSA** — ed25519 est refusé (VÉRIFIÉ dans la
   doc Oracle, la question traînait comme inconnue depuis plusieurs sessions).
   D'où `~/.ssh/caffelatte_console_rsa`, distincte de `caffelatte_ed25519`. Son
