@@ -1,0 +1,20 @@
+# Inventaire du mode PULL — la machine se configure elle-même.
+#
+# `inventory.yml` (gitignoré) sert au mode push depuis le portable. Celui-ci est
+# versionné exprès : `ansible-pull` le lit sur la machine cible, depuis le clone
+# du dépôt, et il n'y a personne pour le remplir à la main.
+#
+# `localhost` et PAS le vrai nom d'hôte : `ansible-pull` restreint l'exécution à
+# `<fqdn>,<hostname>,localhost,127.0.0.1`. Passer par `localhost` rend le
+# bootstrap indépendant du nom que l'hôte se donne — sinon un nom d'hôte
+# inattendu donne « no hosts matched », c'est-à-dire un déploiement qui ne fait
+# rien en se terminant en succès.
+#
+# Le groupe reste `arm` : c'est lui que `site.yml` cible et auquel les
+# éventuelles variables de groupe se rattachent.
+all:
+  children:
+    arm:
+      hosts:
+        localhost:
+          ansible_connection: local

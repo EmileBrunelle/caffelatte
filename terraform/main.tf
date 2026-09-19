@@ -194,6 +194,38 @@ resource "oci_core_instance" "core" {
 
   metadata = {
     ssh_authorized_keys = var.ssh_public_key
+    # LU AU PREMIER DEMARRAGE SEULEMENT. Le modifier ensuite ne rejoue rien :
+    # il faudrait recreer l'instance, donc reperdre la capacite ARM.
+    user_data = base64encode(file("${path.module}/cloud-init.yaml"))
+  }
+
+  agent_config {
+    # La surveillance publie la MEMOIRE et le RESEAU. Sans elle Oracle ne voit
+    # que le CPU, or il recupere les A1 inactives sur les trois axes a la fois
+    # (CPU ET reseau ET memoire sous 20 % sur 7 jours) : n'en exposer qu'un,
+    # c'est se faire juger sur le pire. C'est aussi la source de l'alarme de
+    # disponibilite.
+    is_monitoring_disabled = false
+    is_management_disabled = false
+
+    plugins_config {
+      name          = "Compute Instance Monitoring"
+      desired_state = "ENABLED"
+    }
+    plugins_config {
+      # Canal hors-bande sans port 22 ni regle entrante : la console pousse la
+      # commande par la connexion sortante de l'agent. Vu que le 22 sortant est
+      # bloque sur le reseau de l'operateur (ADR 0010), c'est le bris de glace
+      # le plus accessible.
+      name          = "Compute Instance Run Command"
+      desired_state = "ENABLED"
+    }
+    plugins_config {
+      # Alimente OCI Logging / Logging Analytics, refuse par l'ADR 0005 :
+      # facture au Go passe l'allotissement, sans coupure. Loki reste local.
+      name          = "Custom Logs Monitoring"
+      desired_state = "DISABLED"
+    }
   }
 
   # La capacité ARM à Montréal est intermittente. `terraform apply` échoue en

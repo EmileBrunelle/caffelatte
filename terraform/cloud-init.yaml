@@ -1,0 +1,75 @@
+#cloud-config
+# Amorçage de l'hôte au TOUT PREMIER démarrage (ADR 0010).
+#
+# Sans ce fichier la machine naît avec une clé SSH dans ses métadonnées et rien
+# d'autre : il faut entrer à la main pour déployer. Or le port 22 SORTANT est
+# bloqué sur le réseau de l'opérateur, ce qui fait justement d'`ansible-pull` le
+# mécanisme principal. L'amorçage manquait ; le voici.
+#
+# ATTENTION : cloud-init ne lit `user_data` qu'au PREMIER démarrage. Modifier ce
+# fichier ne change rien à une instance déjà née — il faut la recréer, donc
+# reperdre la capacité ARM. Ce qui suit doit rester le strict minimum capable
+# d'aller chercher le reste ; tout le vrai travail appartient au playbook, qui
+# lui se corrige par un simple `git push` sur `deploy`.
+
+package_update: true
+packages:
+  - git
+  # Le paquet du CONTRÔLEUR Ansible : ici la machine est son propre contrôleur.
+  - ansible-core
+
+write_files:
+  - path: /usr/local/sbin/caffelatte-pull
+    permissions: "0755"
+    owner: root:root
+    content: |
+      #!/bin/bash
+      # Déploiement en mode pull : l'hôte va chercher le dépôt en HTTPS (443),
+      # le seul port sortant qui passe. Voir ADR 0010.
+      set -eu
+      exec /usr/bin/ansible-pull \
+        --url https://github.com/EmileBrunelle/caffelatte.git \
+        --checkout deploy \
+        --directory /var/lib/caffelatte \
+        --inventory ansible/inventory-pull.yml \
+        ansible/site.yml
+
+  - path: /etc/systemd/system/caffelatte-pull.service
+    content: |
+      [Unit]
+      Description=Deploiement caffelatte par ansible-pull
+      # Sans reseau, le clone echoue et le service bat inutilement.
+      Wants=network-online.target
+      After=network-online.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/caffelatte-pull
+
+  - path: /etc/systemd/system/caffelatte-pull.timer
+    content: |
+      [Unit]
+      Description=Deploiement caffelatte, une fois par heure
+
+      [Timer]
+      # Une heure suffit : ce projet ne livre pas en continu. Le delai aleatoire
+      # evite de taper GitHub a la seconde ronde depuis toutes les machines.
+      OnBootSec=2min
+      OnUnitActiveSec=1h
+      RandomizedDelaySec=10min
+      # Rattrape l'execution manquee si la machine etait eteinte ou redemarrait.
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+
+runcmd:
+  # Le timer, et non un `ansible-pull` unique : si le premier passage echoue
+  # (branche absente, erreur de playbook, reseau), la machine REESSAIE toute
+  # seule. Corriger se fait alors par `git push` sur `deploy`, sans aucun acces
+  # a la machine — ce qui compte quand le SSH sortant est bloque d'ici.
+  # Contrepartie assumee : un mauvais commit sur `deploy` se deploie tout seul.
+  # ponytail: auto-guerison par le depot ; si un jour ca mord, mettre une
+  # validation sur la branche `deploy` plutot que de retirer le timer.
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, --now, caffelatte-pull.timer]
