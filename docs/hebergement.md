@@ -30,6 +30,37 @@ et le téraoctet de transfert, qui sont ce qui se vend, pas la fréquence par c�
    dans un centre de données qu'on ne contrôle pas. Beauharnois, Montréal et
    Toronto se vérifient par un traceroute.
 
+## Dimensionner : tu n'as pas besoin de 12 Go
+
+12 Go est l'allocation d'Oracle, pas un besoin. Pour 5-10 joueurs en vanilla
+Fabric : 4 Go de tas plus environ 1 Go pour le système et le proxy. Un VPS de
+**6 à 8 Go** est confortable et laisse de la place pour ajouter Forgejo ou
+Grafana plus tard.
+
+Prendre 12 Go parce qu'Oracle en donnait 12 serait s'ancrer sur le mauvais
+chiffre — surtout que le goulot est le CPU monocœur, pas la RAM.
+
+## Ordres de grandeur au Québec (septembre 2026)
+
+À vérifier chez le fournisseur : les prix bougent et plusieurs de ces offres
+sont des promotions datées.
+
+| Offre | Config | Prix |
+|---|---|---|
+| Elixior (Montréal) | 8 Go, 4 vCore, 50 Go NVMe | ~6,50 $ CA/mois |
+| Gnome IT (Montréal) | 6 Go, 2 vCPU | ~8 $/mois |
+| OVHcloud (Beauharnois) | 4 Go, 2 vCPU (Essential) | entrée ~4,35 $/mois |
+| Elixior High CPU | 8 Go, 16 vCPU | ~27,75 $ CA/mois |
+
+**Budget réaliste : 8 à 15 $ CA par mois** pour 6-8 Go qui passent les filtres.
+
+Deux prudences avec les offres les moins chères : prendre **au mois**, jamais en
+prépayé annuel chez un fournisseur récent (le taux de disparition est réel dans
+ce segment), et exécuter le test monocœur avant de migrer le monde dessus.
+
+Ce que le gratuit d'Oracle vaut vraiment : environ 120 $ par an d'économie, en
+échange de la loterie de capacité et de la politique de récupération.
+
 ## État de la décision
 
 - **Oracle `ca-montreal-1`, Always Free** — 0 $, mais la capacité ARM est une
