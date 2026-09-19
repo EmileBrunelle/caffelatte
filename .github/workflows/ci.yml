@@ -49,5 +49,5 @@ jobs:
       # l'appel part non authentifié depuis une IP de runner partagée et se fait
       # limiter (403) — échec intermittent, sans rapport avec le code scanné.
       - uses: aquasecurity/tfsec-action@v1.0.3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
