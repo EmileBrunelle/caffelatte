@@ -15,3 +15,4 @@ HANDOFF.md
 # Config du backend OpenTofu : contient la Customer Secret Key.
 terraform/backend.hcl
 capacite-arm.log
+.veilleuse-wip/
