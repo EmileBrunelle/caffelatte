@@ -1,0 +1,40 @@
+# Checkov remplace tfsec, qui ne servait à rien ici : tfsec et Trivy n'ont
+# aucune règle Oracle Cloud. Vérifié par contrôle positif le 2026-09-19 — sur
+# une `oci_core_security_list` ouvrant le port 22 à 0.0.0.0/0, tfsec répond
+# « No problems detected » avec `passed: 0`, c'est-à-dire zéro règle évaluée,
+# tandis que Checkov lève CKV_OCI_19. Ne pas revenir à tfsec ni à
+# `trivy config` en croyant y gagner un scan : sur de l'OCI, les deux sont muets.
+
+directory:
+  - terraform
+
+# Chaque exemption ci-dessous est une décision, pas un contournement.
+skip-check:
+  # --- Refusées : incompatibles avec le tier gratuit ---------------------
+  # Clés gérées par le client (OCI Vault). Un coffre Vault et ses clés sont
+  # facturés ; tout ce projet tient dans l'Always Free. Le chiffrement par clé
+  # Oracle reste actif dans les deux cas.
+  - CKV_OCI_3   # volume bloc chiffré par CMK
+  - CKV_OCI_9   # bucket chiffré par CMK
+
+  # Politique de sauvegarde OCI sur le volume bloc. Les sauvegardes de volume
+  # sont facturées au stockage consommé, et le monde est déjà sauvegardé hors
+  # site par restic avec gel préalable — ce qui protège aussi de la perte de la
+  # tenancy, ce qu'une sauvegarde OCI ne fait pas.
+  - CKV_OCI_2
+
+  # --- Refusée : sans objet ici ------------------------------------------
+  # Événements d'objet sur le bucket. Ils servent à déclencher des fonctions en
+  # réaction à un dépôt ; personne n'écoute, et le bucket est en NoPublicAccess
+  # avec versioning.
+  - CKV_OCI_7
+
+  # --- À CORRIGER, pas à exempter définitivement -------------------------
+  # Ces deux-là sont du durcissement gratuit sur `oci_core_instance.core`
+  # (`is_pv_encryption_in_transit_enabled`, `are_legacy_imds_endpoints_disabled`).
+  # Elles ne sont pas prises au passage parce que la boucle d'attente de
+  # capacité lance `tofu apply` toute seule : une erreur dans le bloc instance
+  # ne se verrait qu'au moment où la capacité ARM se libère, et coûterait la
+  # fenêtre. À faire délibérément, avec un `tofu plan` sous les yeux.
+  - CKV_OCI_4   # chiffrement en transit du volume d'amorçage
+  - CKV_OCI_5   # endpoint IMDS hérité encore actif

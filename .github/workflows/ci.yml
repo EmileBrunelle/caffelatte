@@ -45,9 +45,10 @@ jobs:
       - uses: opentofu/setup-opentofu@v1
       - run: tofu -chdir=terraform fmt -check
       - run: tofu -chdir=terraform init -backend=false && tofu -chdir=terraform validate
-      # tfsec-action résout sa dernière release via l'API GitHub. Sans jeton,
-      # l'appel part non authentifié depuis une IP de runner partagée et se fait
-      # limiter (403) — échec intermittent, sans rapport avec le code scanné.
-      - uses: aquasecurity/tfsec-action@v1.0.3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+      # Checkov, pas tfsec : voir .checkov.yaml. tfsec n'a aucune règle OCI et
+      # n'a donc jamais rien pu détecter ici. Installé par pipx comme
+      # ansible-lint plus haut, ce qui évite une action tierce de plus — c'est
+      # justement l'appel à l'API GitHub de tfsec-action qui échouait par
+      # intermittence. La configuration, dont les exemptions, vit dans
+      # .checkov.yaml pour être lisible hors du workflow.
+      - run: pipx install checkov && checkov --config-file .checkov.yaml --compact
