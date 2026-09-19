@@ -16,3 +16,17 @@ minecraft_simulation_distance: 6
 # c'est ce qui fait chuter le TPS sur 2 OCPU.
 minecraft_border_radius: 5000
 maintenance_warn_minutes: [15, 5, 1]
+
+# Mise en veille du serveur quand il est vide. Gate garde le port, démarre le
+# backend à la première connexion, l'arrête après N minutes sans joueur.
+#
+# ATTENTION — à laisser à false sur un compte Oracle Always Free. Oracle
+# récupère les instances INACTIVES : CPU p95 < 20 % ET réseau < 20 % ET mémoire
+# < 20 % sur 7 jours (mémoire pour les formes A1 seulement). Un `-Xms4G` sur
+# 12 Go réserve 33 % en permanence — le serveur qui tourne à vide est ce qui
+# empêche la récupération. L'éteindre la provoque.
+#
+# Sur un VPS payé, la récupération n'existe pas : passer à true est un gain net
+# (2 vCPU libérés pour le reste quand personne ne joue).
+minecraft_sleep_when_empty: false
+minecraft_sleep_after_minutes: 20

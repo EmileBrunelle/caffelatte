@@ -11,6 +11,20 @@ type Window struct {
 // Warnings est le compte à rebours diffusé avant StartsAt.
 var Warnings = []time.Duration{15 * time.Minute, 5 * time.Minute, time.Minute}
 
+// La mise en veille et la fenêtre de maintenance sont le MÊME problème : dans
+// les deux cas le backend est absent et Gate tient la connexion. La différence
+// tient à ce qui met fin à l'absence — un redémarrage terminé, ou un joueur qui
+// frappe à la porte. D'où un seul chemin de code, et handleDuringOutage au
+// milieu des deux.
+//
+// SleepWhenEmpty ne doit PAS être activé sur un compte Oracle Always Free :
+// Oracle récupère les instances inactives (CPU, réseau et mémoire tous sous
+// 20 % sur 7 jours). Voir ansible/group_vars/all/main.yml.
+var (
+	SleepWhenEmpty bool
+	SleepAfter     = 20 * time.Minute
+)
+
 // Register branche le plugin sur le proxy.
 func Register() {
 	// TODO(émile) : voir le README de la section « À toi de jouer ».
