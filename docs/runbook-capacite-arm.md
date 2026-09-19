@@ -33,8 +33,14 @@ martèlement peut faire bloquer le compte.
 ## Si Montréal ne donne rien
 
 Par ordre de préférence :
-1. Passer en Pay As You Go (les ressources Always Free le restent, mais la
-   capacité est priorisée). C'est le levier qui marche le plus souvent.
+1. Continuer à réessayer. La capacité revient par vagues ; c'est le cas le plus
+   fréquent et il ne coûte que de la patience.
 2. Demander le changement de région d'origine vers `ca-toronto-1`.
 3. Rabattre sur un fournisseur ARM tiers. Rien dans ce dépôt n'est spécifique à
    OCI (ADR 0005) : `ansible-playbook site.yml` contre un hôte EL suffit.
+
+**Pas Pay As You Go.** C'est le levier qui débloque la capacité le plus souvent,
+et il est écarté quand même : sur un compte non converti une ressource payante
+échoue au lieu de facturer, et cette garantie est le seul coupe-circuit qui
+existe — les budgets d'OCI ne font que notifier, ils ne coupent rien. La
+conversion est IRRÉVERSIBLE. Voir `docs/couts.md`.

@@ -15,7 +15,15 @@ autres. Elle peut ne jamais venir.
 gratuites, et la capacité ARM devient nettement plus accessible. Mais le filet
 disparaît : une ressource payante se crée et se facture au lieu d'échouer.
 
-Le budget et les alertes de `terraform/main.tf` existent pour ce second cas.
+**Décision : rester Always Free, jamais convertir.** Le compte est personnel et
+personne ne surveille une facture quotidienne. La conversion est IRRÉVERSIBLE et
+n'est jamais automatique — c'est un geste délibéré, donc un geste qu'on s'interdit.
+Attendre la capacité ARM coûte du temps ; la perdre de vue en Pay As You Go coûte
+de l'argent réel. Le runbook de capacité applique cette décision.
+
+Le budget et les alertes de `terraform/main.tf` ne sont donc qu'une ceinture de
+sécurité pour un cas qui ne devrait jamais arriver : ils NOTIFIENT, ils ne
+coupent rien. Aucun garde-fou de facturation n'existe chez Oracle.
 L'alerte sur la *prévision* est celle qui sert : elle avertit avant que l'argent
 sorte, pas après.
 

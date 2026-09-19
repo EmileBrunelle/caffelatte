@@ -24,6 +24,19 @@ terraform {
   }
 }
 
+# Sans ce bloc, le provider retombe sur l'auth par clé d'API du profil DEFAULT
+# et chaque appel répond 401-NotAuthenticated. Le compte n'a pas de clé d'API :
+# il s'ouvre par jeton de session (`oci session authenticate`), qui expire au
+# bout d'une heure. Le backend d'état, lui, s'authentifie par Customer Secret
+# Key — les deux chemins sont disjoints, d'où un `init` vert sur un `apply` mort.
+provider "oci" {
+  auth                = "SecurityToken"
+  config_file_profile = "CaffeLatte"
+  # En mode SecurityToken le provider ne lit PAS la région du fichier de config :
+  # sans cette ligne il échoue avec « can not get region from Terraform configuration ».
+  region = "ca-montreal-1"
+}
+
 resource "oci_core_vcn" "main" {
   compartment_id = var.compartment_id
   cidr_blocks    = ["10.0.0.0/16"]

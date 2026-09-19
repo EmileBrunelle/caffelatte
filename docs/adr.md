@@ -227,3 +227,25 @@ public destiné au portfolio, pour zéro gain fonctionnel ici) ; garder le binai
 non géré (dette qu'on aurait payée à la prochaine CVE du SDK AWS).
 **Piège à retenir :** `init` ne fait que LIRE l'état. Un backend « initialisé
 avec succès » peut être mort en écriture — le test réel est `plan` avec verrou.
+
+## 0012 — Le provider OCI s'authentifie par jeton de session (2026-09-19)
+**Décidé :** un bloc `provider "oci"` explicite dans `terraform/main.tf`, avec
+`auth = "SecurityToken"`, `config_file_profile = "CaffeLatte"` et `region`.
+**Pourquoi :** il n'y avait aucun bloc `provider`. Le provider retombait alors
+sur son défaut — l'authentification par clé d'API du profil `DEFAULT` — et le
+compte n'a pas de clé d'API : il s'ouvre par `oci session authenticate`. Chaque
+appel répondait `401-NotAuthenticated`, sur TOUS les services à la fois.
+La `region` est obligatoire dans le bloc : en mode `SecurityToken` le provider
+ne la lit pas dans `~/.oci/config` et échoue sur « can not get region from
+Terraform configuration ».
+**Piège à retenir :** ce trou a survécu cinq sessions parce que rien ne le
+touchait. La CI ne fait que `fmt -check` et `validate`, deux commandes qui
+n'appellent jamais l'API du fournisseur ; et `plan` sur un état vide n'en
+appelle presque pas. Le premier vrai contact avec l'authentification, c'est
+`apply`. Même famille que le piège de l'ADR 0011 (`init` ne fait que lire), un
+étage plus haut — et les deux chemins d'authentification sont disjoints : le
+backend d'état passe par une Customer Secret Key, le provider par le jeton.
+**Conséquence opérationnelle :** le jeton expire après une heure. Une session de
+travail qui dépasse ça doit relancer `oci session authenticate --profile-name
+CaffeLatte --region ca-montreal-1` — `oci session refresh` échoue une fois le
+jeton périmé.
