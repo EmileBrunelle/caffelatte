@@ -1,16 +1,15 @@
 # Geyser en mode standalone : la traduction Bedrock vit ici, pas dans le serveur
 # de jeu. Le backend reste du Fabric pur.
-FROM docker.io/library/eclipse-temurin:21-jre
+# Même base que l'image minecraft (Geyser n'a besoin que de Java 21) : layers mutualisés.
+FROM registry.access.redhat.com/ubi10/openjdk-25-runtime:latest
 LABEL io.containers.autoupdate=registry
 ARG GEYSER_BUILD=latest
+USER 0
 RUN useradd -u 10001 -r -m -d /opt/geyser geyser
 WORKDIR /opt/geyser
 ADD --chown=geyser:geyser \
   https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/${GEYSER_BUILD}/downloads/standalone \
   geyser.jar
-ADD --chown=geyser:geyser \
-  https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/standalone \
-  floodgate.jar
 USER geyser
 EXPOSE 19132/udp
 ENTRYPOINT ["java", "-Xms256M", "-Xmx512M", "-jar", "geyser.jar"]

@@ -1,12 +1,15 @@
 # Image Minecraft maison : Fabric + mods serveur-only à parité vanilla.
-# Pas d'image Minecraft tierce — seulement un JRE officiel comme base.
-FROM docker.io/library/eclipse-temurin:21-jdk AS build
-ARG MC_VERSION=1.21.8
-ARG FABRIC_INSTALLER=1.0.3
+# Pas d'image Minecraft tierce — seulement un JDK/JRE officiel comme base.
+FROM registry.access.redhat.com/ubi10/openjdk-25:latest AS build
+ARG MC_VERSION=26.2
+ARG FABRIC_INSTALLER=1.1.2
 # Mods serveur-only : ne changent AUCUN comportement de jeu, seulement la perf.
-ARG MODS="lithium ferrite-core krypton fabricproxy-lite chunky"
+ARG MODS="fabric-api lithium ferrite-core krypton fabricproxy-lite chunky"
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl jq && rm -rf /var/lib/apt/lists/*
+USER 0
+# UBI, pas Debian : microdnf au lieu d'apt-get (curl et tar sont déjà présents,
+# mais pas gzip, nécessaire pour décompresser l'archive rcon-cli).
+RUN microdnf install -y jq gzip && microdnf clean all
 WORKDIR /build
 
 RUN curl -fsSL -o installer.jar \
@@ -24,17 +27,23 @@ RUN mkdir -p mods && for slug in ${MODS}; do \
 
 # rcon-cli : c'est lui qui porte les avertissements en jeu avant un redémarrage.
 ARG RCON_CLI=1.7.0
-RUN arch=$(dpkg --print-architecture) \
+# UBI n'a pas dpkg : on mappe uname -m vers les noms d'archive Go (amd64/arm64).
+RUN case "$(uname -m)" in \
+      x86_64) arch=amd64 ;; \
+      aarch64) arch=arm64 ;; \
+      *) echo "architecture non supportée: $(uname -m)"; exit 1 ;; \
+    esac \
  && curl -fsSL "https://github.com/itzg/rcon-cli/releases/download/${RCON_CLI}/rcon-cli_${RCON_CLI}_linux_${arch}.tar.gz" \
     | tar xz rcon-cli
 
-FROM docker.io/library/eclipse-temurin:21-jre
+FROM registry.access.redhat.com/ubi10/openjdk-25-runtime:latest
 LABEL org.opencontainers.image.source="https://github.com/caffelatte/caffelatte"
 # Auto-update natif de Podman : `podman auto-update` suit le registre.
 LABEL io.containers.autoupdate=registry
 
+USER 0
 RUN useradd -u 10000 -r -m -d /data minecraft
-COPY --from=build /build/fabric-server-launch.jar /build/libraries /opt/mc/
+COPY --from=build /build/fabric-server-launch.jar /build/server.jar /opt/mc/
 COPY --from=build /build/libraries /opt/mc/libraries
 COPY --from=build /build/mods /opt/mc/mods
 COPY --from=build /build/rcon-cli /usr/local/bin/rcon-cli
