@@ -28,5 +28,7 @@ maintenance_warn_minutes: [15, 5, 1]
 #
 # Sur un VPS payé, la récupération n'existe pas : passer à true est un gain net
 # (2 vCPU libérés pour le reste quand personne ne joue).
+# À l'année sur Oracle Always Free : DOIT rester false. Le serveur qui tourne
+# à vide avec 4 Go réservés est ce qui empêche la récupération pour inactivité.
 minecraft_sleep_when_empty: false
 minecraft_sleep_after_minutes: 20

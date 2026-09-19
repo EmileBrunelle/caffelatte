@@ -3,7 +3,37 @@
 Plafond fixé : 200 $ CA par année. Conclusion : le plan recommandé en utilise
 la moitié, et le reste ne devrait pas être dépensé.
 
-## Recommandé — à l'année, ~100 $ CA
+## Recommandé — Oracle d'abord, VPS en assurance : ~22 $ CA par année
+
+Contrainte retenue : le serveur tourne **à l'année**. C'est ce qui rend Oracle
+viable — un serveur permanent avec `-Xms4G` sur 12 Go garde 33 % de mémoire
+réservée en continu, donc le critère de récupération pour inactivité (CPU,
+réseau ET mémoire tous sous 20 % sur 7 jours) n'est jamais rempli.
+
+| Poste | Coût annuel |
+|---|---|
+| VM ARM Oracle Always Free, 2 OCPU / 12 Go | 0 $ |
+| Nom de domaine | ~20 $ |
+| Sauvegarde hors site B2, ~20 Go | ~2 $ |
+| **Total** | **~22 $** |
+
+Le reste du budget (~175 $) n'est pas dépensé : c'est le **fonds de migration**.
+Si Oracle récupère l'instance ou change ses conditions, le VPS de Montréal est
+en service le jour même avec le même playbook. Une année complète de VPS coûte
+78 $ — le fonds en couvre deux.
+
+Exploiter le gratuit d'Oracle vaut la peine **précisément parce que le coût de
+sortie est d'une heure**. Sans la portabilité construite dans `ansible/`, ce
+serait un pari ; avec elle, c'est de l'argent gratuit.
+
+### La règle d'arrêt
+
+La capacité ARM à Montréal est intermittente. Lancer la boucle de réessai de
+`runbook-capacite-arm.md` et se donner **trois semaines**. Passé ce délai,
+acheter le VPS et ne plus y penser — le temps passé à surveiller une loterie
+dépasse vite les 78 $ qu'elle économise.
+
+## Repli — VPS à l'année, ~100 $ CA
 
 | Poste | Fournisseur | Coût annuel |
 |---|---|---|
@@ -12,18 +42,9 @@ la moitié, et le reste ne devrait pas être dépensé.
 | Sauvegarde hors site, ~20 Go | Backblaze B2 (0,006 $ US/Go/mois) | ~2 $ |
 | **Total** | | **~100 $** |
 
-## Variante saisonnière — ~60 $ CA
-
-Le VPS facturé au mois, détruit hors saison et reconstruit au retour du groupe
-(voir `hebergement.md`). Domaine et sauvegardes restent actifs à l'année : ce
-sont eux qui rendent la reconstruction possible.
-
-| Poste | Coût annuel |
-|---|---|
-| VPS, 5 mois actifs | ~33 $ |
-| Domaine | ~20 $ |
-| Sauvegarde B2 | ~2 $ |
-| **Total** | **~55 $** |
+La variante saisonnière (détruire hors saison, ~55 $/an) est écartée : le
+serveur doit tourner à l'année. Le mécanisme reste utile — c'est lui qui rend
+la migration possible en une heure.
 
 ## Ce qu'il ne faut PAS faire avec les 100 $ restants
 
