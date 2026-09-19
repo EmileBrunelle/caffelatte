@@ -9,3 +9,9 @@ variable "public_tcp_ports" {
   default     = [25565, 443, 80]
   description = "Ports TCP publics. 22 est volontairement absent : accès par Bastion."
 }
+
+variable "tenancy_ocid" { type = string }
+variable "alert_email" {
+  type        = string
+  description = "Destinataire des alertes de budget. Le seul vrai garde-fou en Pay As You Go."
+}

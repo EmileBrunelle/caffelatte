@@ -101,6 +101,9 @@ resource "oci_core_instance" "core" {
   source_details {
     source_type             = "image"
     source_id               = var.arm_image_id
+    # Comptabilité du stockage bloc gratuit : 200 Go au TOTAL pour le tenancy,
+    # volumes de démarrage inclus. 100 ici en laisse 100 pour les deux micro x86
+    # (47 Go chacun par défaut). Dépasser facture, silencieusement.
     boot_volume_size_in_gbs = 100
   }
 
@@ -125,4 +128,38 @@ resource "oci_objectstorage_bucket" "backup" {
   name           = "caffelatte-backup"
   access_type    = "NoPublicAccess"
   versioning     = "Enabled"
+}
+
+# ---------------------------------------------------------------------------
+# Garde-fou de coût. Le but du projet est d'apprendre OCI à 0 $ ; passer en Pay
+# As You Go retire le filet qui fait ÉCHOUER une ressource payante au lieu de la
+# facturer. Ce budget est ce qui remplace ce filet. Il est gratuit.
+# ---------------------------------------------------------------------------
+
+resource "oci_budget_budget" "garde_fou" {
+  compartment_id = var.tenancy_ocid # un budget vit au niveau du tenancy
+  target_type    = "COMPARTMENT"
+  targets        = [var.compartment_id]
+  amount         = 1 # dollar : tout sauf zéro est une anomalie à investiguer
+  reset_period   = "MONTHLY"
+  display_name   = "caffelatte-garde-fou"
+}
+
+resource "oci_budget_alert_rule" "seuil" {
+  budget_id      = oci_budget_budget.garde_fou.id
+  type           = "ACTUAL"
+  threshold      = 1
+  threshold_type = "ABSOLUTE"
+  recipients     = var.alert_email
+  message        = "caffelatte a dépassé 0 $. Vérifier quelle ressource est sortie du tier gratuit."
+}
+
+# Deuxième alerte sur la PRÉVISION : elle avertit avant que l'argent sorte,
+# pas après. C'est celle qui sert vraiment.
+resource "oci_budget_alert_rule" "prevision" {
+  budget_id      = oci_budget_budget.garde_fou.id
+  type           = "FORECAST"
+  threshold      = 1
+  threshold_type = "ABSOLUTE"
+  recipients     = var.alert_email
 }
