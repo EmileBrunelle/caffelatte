@@ -273,3 +273,34 @@ l'hypothèse a été rejetée en remettant un commentaire et en replanifiant.
 travail qui dépasse ça doit relancer `oci session authenticate --profile-name
 CaffeLatte --region ca-montreal-1` — `oci session refresh` échoue une fois le
 jeton périmé.
+
+## 0013 — La boucle de capacité garde `tofu apply` ; pas de `oci launch` + `import` (2026-09-19)
+
+**Décision : la boucle d'attente continue de lancer `tofu apply` quand la
+capacité ARM se libère.** L'alternative envisagée depuis deux sessions — capturer
+la capacité avec `oci compute instance launch`, puis récupérer l'instance par
+`tofu import` — est refusée.
+
+Ce qui la rendait tentante : `apply` prend le verrou d'état, et un verrou
+orphelin a déjà coûté une nuit. `oci compute instance launch` ne prend rien.
+
+Ce qui la condamne : elle demande de répliquer à la main les champs du bloc
+`oci_core_instance` (forme, `shape_config`, `source_details`,
+`create_vnic_details`, `metadata`, `agent_config`, et depuis aujourd'hui
+`is_pv_encryption_in_transit_enabled` et `instance_options`). Un seul champ
+divergent et le `plan` qui suit l'`import` propose de **remplacer** l'instance —
+donc de relâcher la capacité ARM qu'on vient d'attendre des semaines. Le remède
+détruit précisément ce qu'il protège, et le fait au pire moment.
+
+**Le fait qui tranche, vérifié aujourd'hui :** le verrou n'est pas un péage
+permanent. Les lectures se font sous `-lock=false` (`tofu plan -lock=false` a
+servi à valider le durcissement de l'instance pendant que la boucle tournait,
+sans la déranger). Le verrou n'est donc pris que par l'`apply` de la boucle,
+c'est-à-dire exactement le moment où il doit l'être — une opération qui écrit
+mérite son verrou. Le risque résiduel se réduit à un `apply` interrompu, qui se
+répare par un `force-unlock` documenté, là où un `import` raté se répare en
+attendant à nouveau la capacité.
+
+**Corollaire pour le travail courant :** toute inspection de l'état pendant que
+la boucle tourne passe par `-lock=false`. Ce n'est pas un contournement, c'est
+la lecture correcte.
