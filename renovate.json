@@ -1,0 +1,9 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "docker:pinDigests"],
+  "description": "Épingler par digest est ce qui rend une image reproductible ; Renovate est ce qui empêche l'épinglage de pourrir en image non patchée.",
+  "packageRules": [
+    { "matchUpdateTypes": ["minor", "patch", "digest"], "automerge": true },
+    { "matchPackageNames": ["eclipse-temurin"], "automerge": false }
+  ]
+}

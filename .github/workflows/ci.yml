@@ -4,6 +4,7 @@ on: [push, pull_request]
 jobs:
   lint:
     runs-on: ubuntu-latest
+    permissions: { contents: read, packages: write, id-token: write }
     steps:
       - uses: actions/checkout@v4
       - run: pipx install ansible-lint && ansible-lint ansible/
@@ -14,6 +15,30 @@ jobs:
 
   image:
     runs-on: ubuntu-24.04-arm
+    permissions: { contents: read, packages: write, id-token: write }
     steps:
       - uses: actions/checkout@v4
       - run: podman build -t minecraft containers/minecraft
+
+      # On construit sa propre image : on hérite donc de la responsabilité de
+      # savoir ce qu'il y a dedans. Échec sur CVE haute ou critique corrigeable.
+      - uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: minecraft
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      # Signature sans clé (OIDC GitHub) : l'hôte peut vérifier que l'image
+      # vient bien de ce dépôt avant de l'exécuter.
+      - if: github.ref == 'refs/heads/main'
+        run: |
+          cosign sign --yes ghcr.io/caffelatte/minecraft@"$DIGEST"
+
+  terraform:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, packages: write, id-token: write }
+    steps:
+      - uses: actions/checkout@v4
+      - run: terraform -chdir=terraform init -backend=false && terraform -chdir=terraform validate
+      - uses: aquasecurity/tfsec-action@v1.0.3
