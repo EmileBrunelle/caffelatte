@@ -83,12 +83,37 @@ sonder_capacite() {
     >"$RAPPORT" 2>&1
 }
 
+# La boucle applique l'ARBRE DE TRAVAIL, pas HEAD. Un .tf modifié et non
+# commité au moment où la capacité se libère part donc en production à 3 h du
+# matin sans que personne l'ait relu — sur la ressource la plus chère à
+# reprendre du projet, puisque rater l'A1 se repaie en semaines d'attente.
+# C'est arrivé de justesse le 2026-09-19 : du code d'une nouvelle instance
+# traînait dans terraform/ pendant que la boucle tournait.
+#
+# Rater une vague se rattrape, la vague suivante arrive. Appliquer du non-relu
+# ne se rattrape pas. D'où le refus, et non l'avertissement.
+arbre_propre() {
+  [ -z "$(git -C "$REPO" status --porcelain -- terraform/ 2>/dev/null)" ]
+}
+
 creer_instance() {
+  if ! arbre_propre; then
+    journal "REFUS D'APPLIQUER : terraform/ a des modifications non commitées."
+    git -C "$REPO" status --porcelain -- terraform/ | tee -a "$JOURNAL"
+    return 3
+  fi
   cd "$TF" || return 1
   tofu plan -no-color -input=false -var-file=terraform.tfvars \
     -var "profil_oci=$PROFIL" -var "auth_oci=ApiKey" -out="$PLAN" 2>&1 &&
     tofu apply -no-color -input=false "$PLAN" 2>&1
 }
+
+if ! arbre_propre; then
+  journal "ARRÊT AU DÉMARRAGE : terraform/ a des modifications non commitées."
+  git -C "$REPO" status --porcelain -- terraform/ | tee -a "$JOURNAL"
+  journal "Commiter ou remiser avant de veiller : la boucle applique l'arbre de travail."
+  exit 1
+fi
 
 journal "Début. Profil $PROFIL, forme ${OCPUS} OCPU / ${MEMOIRE} Go, sonde aux $((INTERVALLE / 60)) min."
 tentative=0
@@ -122,8 +147,11 @@ while true; do
   # sonde et l'apply — dans ce cas on retombe dans la boucle sans drame.
   journal "Sonde $tentative : CAPACITÉ DISPONIBLE. Création en cours."
   sortie="$(creer_instance)"
+  # Capturé TOUT DE SUITE : $? ne survit pas au premier test, et les branches
+  # plus bas en ont besoin pour distinguer un refus d'un échec d'apply.
+  code=$?
 
-  if [ $? -eq 0 ]; then
+  if [ "$code" -eq 0 ]; then
     journal "SUCCÈS à la tentative $tentative. L'instance existe."
     printf '%s\n' "$sortie" | grep -E 'Creation complete|Apply complete' >>"$JOURNAL"
     journal "Suite : docs/runbook-capacite-arm.md, puis vérifier les deux accès."
@@ -135,6 +163,14 @@ while true; do
     journal "Fenêtre refermée pendant la création. On continue de sonder."
     sleep "$INTERVALLE"
     continue
+  fi
+
+  # Arbre sali PENDANT la veille : quelqu'un travaille dans terraform/. Arrêter
+  # est le comportement utile — sonder pour refuser chaque fenêtre ne protège
+  # rien et laisse croire que la veille tient.
+  if [ "$code" -eq 3 ]; then
+    journal "ARRÊT : arbre de travail sali pendant la veille."
+    exit 3
   fi
 
   # Une erreur qui n'est PAS un manque de capacité doit arrêter la boucle :
