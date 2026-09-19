@@ -222,6 +222,11 @@ func Register() {
 					return répondre(c.Source, color.Yellow, "Usage : /invite-bedrock <gamertag Xbox>")
 				})))
 
+			p.Command().Register(brigodier.Literal("invites").
+				Executes(command.Command(func(c *command.Context) error {
+					return pl.afficherArbre(c.Source)
+				})))
+
 			p.Command().Register(brigodier.Literal("uninvite").
 				Then(brigodier.Argument("cible", brigodier.StringPhrase).
 					Executes(command.Command(func(c *command.Context) error {
@@ -411,6 +416,21 @@ func (p *plugin) peutRévoquer(auteur uuid.UUID, e entrée) bool {
 		return false
 	}
 	return p.cfg.admins[auteur] || e.Parrain == auteur
+}
+
+// afficherArbre affiche l'arbre « qui a invité qui », réservé aux
+// administrateurs : c'est une vue d'ensemble de tous les accès au serveur, pas
+// une commande de tous les jours. Refus poli pour tout le monde d'autre,
+// jamais un dump partiel.
+//
+// Copie sous verrou puis rendu hors verrou (voir liste.copie) : ni mu ni
+// l'envoi réseau ne se chevauchent.
+func (p *plugin) afficherArbre(src command.Source) error {
+	joueur, ok := src.(proxy.Player)
+	if !ok || !p.cfg.admins[joueur.ID()] {
+		return répondre(src, color.Red, "Commande réservée aux administrateurs.")
+	}
+	return répondre(src, color.Yellow, arbreInvitations(p.liste.copie()))
 }
 
 func (p *plugin) refusRévocation(src command.Source, auteurID uuid.UUID, auteur, cible, raison string) error {

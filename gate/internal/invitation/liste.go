@@ -180,6 +180,19 @@ func (l *liste) retirer(cible string, autorisé func(entrée) bool) (entrée, er
 	return trouvée, nil
 }
 
+// copie retourne un instantané de la liste. Verrou pris puis relâché tout de
+// suite : on ne tient jamais mu pendant le rendu d'un arbre ou l'envoi d'un
+// message réseau.
+func (l *liste) copie() map[uuid.UUID]entrée {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	c := make(map[uuid.UUID]entrée, len(l.autorisés))
+	for id, e := range l.autorisés {
+		c[id] = e
+	}
+	return c
+}
+
 // enregistrer écrit la liste de façon atomique. À appeler sous verrou.
 //
 // Fichier temporaire dans le MÊME répertoire (rename n'est atomique que sur un

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -710,5 +711,136 @@ func TestRévocationAutorisation(t *testing.T) {
 	// La console (UUID nul) ne révoque rien, même une entrée orpheline.
 	if p.peutRévoquer(uuid.Nil, entrée{UUID: idTest(1)}) {
 		t.Error("l'UUID nul ne doit donner aucun droit de révocation")
+	}
+}
+
+// --- Arbre des invitations ---------------------------------------------------
+
+func jour(n int) time.Time {
+	return time.Date(2024, 1, n, 0, 0, 0, 0, time.UTC)
+}
+
+// compterLignesEntrées compte les lignes d'entrée (indentées, format
+// « nom (date) ») dans un rendu d'arbreInvitations, sans compter les lignes
+// d'en-tête de section (qui contiennent aussi des parenthèses).
+func compterLignesEntrées(rendu string) int {
+	n := 0
+	for _, ligne := range strings.Split(rendu, "\n") {
+		if strings.HasPrefix(ligne, "  ") {
+			n++
+		}
+	}
+	return n
+}
+
+func TestArbreInvitationsMultiNiveaux(t *testing.T) {
+	config := idTest(1) // parrain de configuration, jamais dans autorisés
+	alice := idTest(2)
+	bob := idTest(3)
+	carla := idTest(4)
+
+	m := map[uuid.UUID]entrée{
+		alice: {UUID: alice, Pseudo: "Alice", Parrain: config, Date: jour(1)},
+		bob:   {UUID: bob, Pseudo: "Bob", Parrain: alice, Date: jour(2)},
+		carla: {UUID: carla, Pseudo: "Carla", Parrain: alice, Date: jour(3)},
+	}
+
+	got := arbreInvitations(m)
+	veut := "Parrain absent de la liste (invités directement, ou par quelqu'un qui n'y est plus) :\n" +
+		"  Alice (2024-01-01)\n" +
+		"    Bob (2024-01-02)\n" +
+		"    Carla (2024-01-03)"
+	if got != veut {
+		t.Errorf("arbre inattendu :\n%s\n--- attendu ---\n%s", got, veut)
+	}
+}
+
+func TestArbreInvitationsOrphelin(t *testing.T) {
+	config := idTest(1)
+	parrainRetiré := idTest(2)
+	alice := idTest(3)
+	orphelin := idTest(4)
+
+	m := map[uuid.UUID]entrée{
+		alice:    {UUID: alice, Pseudo: "Alice", Parrain: config, Date: jour(1)},
+		orphelin: {UUID: orphelin, Pseudo: "Orphelin", Parrain: parrainRetiré, Date: jour(2)},
+	}
+
+	got := arbreInvitations(m)
+
+	if !strings.Contains(got, "Parrain absent de la liste") {
+		t.Errorf("section des orphelins manquante :\n%s", got)
+	}
+	if !strings.Contains(got, "Orphelin (2024-01-02)") {
+		t.Errorf("l'orphelin n'apparaît pas :\n%s", got)
+	}
+	// Le total des lignes affichées doit correspondre au nombre d'entrées :
+	// un orphelin ne doit ni disparaître, ni être compté deux fois.
+	if n := compterLignesEntrées(got); n != len(m) {
+		t.Errorf("total affiché = %d, attendu %d :\n%s", n, len(m), got)
+	}
+}
+
+func TestArbreInvitationsCycle(t *testing.T) {
+	a := idTest(1)
+	b := idTest(2)
+
+	// a et b se pointent l'un l'autre : impossible en usage normal (le
+	// parrain doit déjà être dans la liste au moment de l'invitation), mais
+	// le JSON peut être édité à la main.
+	m := map[uuid.UUID]entrée{
+		a: {UUID: a, Pseudo: "A", Parrain: b, Date: jour(1)},
+		b: {UUID: b, Pseudo: "B", Parrain: a, Date: jour(2)},
+	}
+
+	done := make(chan string, 1)
+	go func() { done <- arbreInvitations(m) }()
+	select {
+	case got := <-done:
+		if !strings.Contains(got, "Parrainage circulaire détecté") {
+			t.Errorf("section de cycle manquante :\n%s", got)
+		}
+		if n := compterLignesEntrées(got); n != len(m) {
+			t.Errorf("total affiché = %d, attendu %d :\n%s", n, len(m), got)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("arbreInvitations a bouclé sur un cycle au lieu de terminer")
+	}
+}
+
+func TestArbreInvitationsPropreParrain(t *testing.T) {
+	soi := idTest(1)
+	m := map[uuid.UUID]entrée{
+		soi: {UUID: soi, Pseudo: "Soi", Parrain: soi, Date: jour(1)},
+	}
+
+	done := make(chan string, 1)
+	go func() { done <- arbreInvitations(m) }()
+	select {
+	case got := <-done:
+		if !strings.Contains(got, "Soi (2024-01-01)") {
+			t.Errorf("l'entrée son-propre-parrain n'apparaît pas :\n%s", got)
+		}
+		if n := compterLignesEntrées(got); n != 1 {
+			t.Errorf("total affiché = %d, attendu 1 :\n%s", n, got)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("arbreInvitations a bouclé sur une entrée son-propre-parrain")
+	}
+}
+
+func TestArbreInvitationsTriDéterministe(t *testing.T) {
+	config := idTest(1)
+	m := map[uuid.UUID]entrée{}
+	for i := byte(2); i < 20; i++ {
+		id := idTest(i)
+		m[id] = entrée{UUID: id, Pseudo: fmt.Sprintf("J%02d", i), Parrain: config, Date: jour(int(i))}
+	}
+
+	référence := arbreInvitations(m)
+	for i := 0; i < 20; i++ {
+		if got := arbreInvitations(m); got != référence {
+			t.Fatalf("sortie non déterministe à l'itération %d :\n%s\n--- vs ---\n%s", i, got, référence)
+		}
 	}
 }
