@@ -20,3 +20,9 @@ CVE-2026-55831 exp:2026-12-31
 CVE-2026-55833 exp:2026-12-31
 CVE-2026-56745 exp:2026-12-31
 CVE-2026-75595 exp:2026-12-31
+
+# golang.org/x/text v0.28.0, embarqué dans rcon-cli. Le correctif amont existe
+# (0.39.0) mais il faut qu'itzg republie rcon-cli : rien à bumper de notre côté,
+# on ne compile pas ce binaire. Expiration courte, ce n'est qu'un rebuild amont.
+# rcon-cli ne parle qu'au serveur Minecraft local, par la boucle locale.
+CVE-2026-56852 exp:2026-11-30

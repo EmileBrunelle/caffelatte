@@ -45,4 +45,9 @@ jobs:
       - uses: opentofu/setup-opentofu@v1
       - run: tofu -chdir=terraform fmt -check
       - run: tofu -chdir=terraform init -backend=false && tofu -chdir=terraform validate
+      # tfsec-action résout sa dernière release via l'API GitHub. Sans jeton,
+      # l'appel part non authentifié depuis une IP de runner partagée et se fait
+      # limiter (403) — échec intermittent, sans rapport avec le code scanné.
       - uses: aquasecurity/tfsec-action@v1.0.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
