@@ -8,7 +8,7 @@ terraform {
   # version où `use_lockfile` du backend s3 est confirmé présent.
   required_version = ">= 1.11"
   required_providers {
-    oci = { source = "oracle/oci", version = "~> 6.0" }
+    oci = { source = "oracle/oci", version = "~> 9.0" }
   }
   # L'état vit dans le bucket, pas sur le portable : le perdre laisse des
   # ressources orphelines facturables qu'on ne retrouve qu'à la facture.
