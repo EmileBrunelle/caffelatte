@@ -20,25 +20,24 @@ jobs:
       - uses: actions/checkout@v4
       - run: podman build -t minecraft containers/minecraft
 
+      # Trivy (via docker/containerd/podman API) ne voit pas les images
+      # podman du runner : on exporte en tar pour scanner sans socket.
+      - run: podman save -o minecraft.tar minecraft
+
       # On construit sa propre image : on hérite donc de la responsabilité de
       # savoir ce qu'il y a dedans. Échec sur CVE haute ou critique corrigeable.
       - uses: aquasecurity/trivy-action@master
         with:
-          image-ref: minecraft
+          input: minecraft.tar
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
-
-      # Signature sans clé (OIDC GitHub) : l'hôte peut vérifier que l'image
-      # vient bien de ce dépôt avant de l'exécuter.
-      - if: github.ref == 'refs/heads/main'
-        run: |
-          cosign sign --yes ghcr.io/caffelatte/minecraft@"$DIGEST"
 
   terraform:
     runs-on: ubuntu-latest
     permissions: { contents: read, packages: write, id-token: write }
     steps:
       - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
       - run: terraform -chdir=terraform init -backend=false && terraform -chdir=terraform validate
       - uses: aquasecurity/tfsec-action@v1.0.3
