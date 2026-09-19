@@ -1,0 +1,41 @@
+# Déploie la pile de jeu. Ne suppose RIEN de l'hébergeur : n'importe quel hôte
+# Enterprise Linux avec Podman fait l'affaire. C'est ce qui rend le choix du
+# fournisseur réversible en une soirée.
+- name: Secrets vers podman secret (tmpfs, jamais en variable d'environnement)
+  ansible.builtin.command:
+    cmd: "podman secret create --replace {{ item.name }} -"
+    stdin: "{{ item.value }}"
+  become_user: svc
+  loop:
+    - { name: rcon_password, value: "{{ rcon_password }}" }
+    - { name: forwarding_secret, value: "{{ forwarding_secret }}" }
+  no_log: true
+  changed_when: true
+
+- name: Volume d'état
+  ansible.builtin.command: "podman volume exists minecraft-data || podman volume create minecraft-data"
+  become_user: svc
+  changed_when: false
+
+- name: Config Gate
+  ansible.builtin.template:
+    src: gate.yml.j2
+    dest: /home/svc/.config/gate/config.yml
+    owner: svc
+    mode: "0640"
+  # Gate surveille ce fichier et recharge à chaud : pas de notify, pas de
+  # redémarrage, personne n'est déconnecté.
+
+- name: Unités Quadlet
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "/home/svc/.config/containers/systemd/{{ item }}"
+    owner: svc
+    mode: "0644"
+  loop: [mc.network, minecraft.container, gate.container, geyser.container]
+  notify: reload user systemd
+
+- name: Démarrer
+  ansible.builtin.command: "{{ svc_systemctl }} enable --now {{ item }}"
+  loop: [minecraft.service, gate.service, geyser.service]
+  changed_when: false

@@ -1,0 +1,23 @@
+config:
+  bind: 0.0.0.0:25565
+  onlineMode: true              # Gate fait l'auth Mojang ; le backend fait confiance
+  forwarding:
+    mode: modern                # secret partagé vérifié par FabricProxy-Lite
+    velocitySecret: "${FORWARDING_SECRET}"
+
+  servers:
+    survie: minecraft:25565
+  try: [survie]
+
+  status:
+    motd: |
+      §6caffelatte §7— survie vanilla
+      §7Java et Bedrock
+    showMaxPlayers: {{ max_players | default(20) }}
+
+  # Limites de connexion. Un serveur Minecraft public se fait scanner en continu ;
+  # sans plafond, un scanner sature la poignée de main avant les vrais joueurs.
+  compression:
+    threshold: 256
+  connectionTimeout: 5s
+  readTimeout: 30s
