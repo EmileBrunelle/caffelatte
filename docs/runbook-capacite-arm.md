@@ -22,18 +22,51 @@ pas pour manque de capacité, et le message ne le distingue pas clairement.
 
 ## Boucle de réessai
 
-    ./scripts/attendre-capacite-arm.sh
+Elle tourne **détachée**, pour survivre à la fermeture du terminal — les vagues
+de capacité passent surtout la nuit :
+
+    systemd-run --user --unit=caffelatte-arm --property=Restart=always \
+      --property=RestartSec=60 \
+      --working-directory=$HOME/Projets/caffelatte \
+      $HOME/Projets/caffelatte/scripts/attendre-capacite-arm.sh
+
+    systemctl --user status caffelatte-arm   # doit dire « active (running) »
+    tail -f capacite-arm.log
+    systemctl --user stop caffelatte-arm     # pour l'arrêter
+
+Pour qu'elle survive aussi à une déconnexion : `sudo loginctl enable-linger
+ebrunelle`. La veille du portable la suspend de toute façon.
 
 Toutes les 5 minutes, pas plus vite : OCI limite le débit des requêtes et un
 martèlement peut faire bloquer le compte. Le script s'arrête tout seul sur une
 erreur qui n'est PAS un manque de capacité — sinon on martèle l'API pendant des
-jours sur une faute de configuration. `Ctrl-C` pour arrêter, relancer est sans
-danger : OpenTofu reprend où l'état en est.
+jours sur une faute de configuration. Relancer est sans danger.
 
-Il passe par OpenTofu, jamais par `oci compute instance launch` ni par
-l'interface web : une instance créée hors de l'état serait invisible pour
+**Ce qui boucle est `CreateComputeCapacityReport`**, une sonde en lecture seule,
+pas `tofu`. `tofu apply` n'est réveillé que quand la sonde annonce de la
+capacité. La raison est concrète : chaque `plan` comme chaque `apply` prend le
+verrou d'état ; une interruption nocturne laissait un verrou orphelin et la
+boucle abandonnait jusqu'au matin — c'est arrivé et ça a coûté une nuit. Le
+verrou n'est plus sur le chemin d'attente, seulement sur le chemin décisif.
+
+    oci compute compute-capacity-report create --compartment-id "$C" \
+      --availability-domain "$AD" --profile CaffeLatteAuto \
+      --shape-availabilities '[{"instanceShape":"VM.Standard.A1.Flex",
+        "instanceShapeConfig":{"ocpus":2.0,"memoryInGBs":12.0}}]'
+
+La clé JSON est `instanceShapeConfig`, **pas** `shapeConfig` : l'autre renvoie un
+400 « Cannot launch flexible instance without ShapeConfig », trompeur.
+
+La création, elle, passe par OpenTofu, jamais par `oci compute instance launch`
+ni par l'interface web : une instance créée hors de l'état serait invisible pour
 `tofu`, qui en recréerait une deuxième. L'interface web n'aide pas non plus la
-capacité — elle appelle la même API et reçoit la même erreur.
+capacité — elle appelle la même API et reçoit la même erreur (mesuré le
+2026-09-19 : la sonde, qui contourne Terraform entièrement, reçoit le même
+`OUT_OF_HOST_CAPACITY`).
+
+**Si un verrou orphelin réapparaît** (« Error acquiring the state lock », la
+boucle s'arrête en une seconde) : vérifier qu'aucun `tofu` ne tourne
+(`pgrep -af tofu`), puis `cd terraform && tofu force-unlock <ID>`.
 
 **Il lui faut un profil OCI à clé d'API**, pas à jeton de session : un jeton
 expire au bout d'une heure et ne se renouvelle pas sans navigateur, donc la
@@ -64,8 +97,29 @@ Par ordre de préférence :
 3. Rabattre sur un fournisseur ARM tiers. Rien dans ce dépôt n'est spécifique à
    OCI (ADR 0005) : `ansible-playbook site.yml` contre un hôte EL suffit.
 
-**Pas Pay As You Go.** C'est le levier qui débloque la capacité le plus souvent,
-et il est écarté quand même : sur un compte non converti une ressource payante
-échoue au lieu de facturer, et cette garantie est le seul coupe-circuit qui
-existe — les budgets d'OCI ne font que notifier, ils ne coupent rien. La
+**Pas Pay As You Go.** Et ce n'est pas un sacrifice : rien n'étaye l'idée que
+PAYG débloque la capacité. Le cas le mieux daté (xxlsteve.net, 2025-05-04) est
+un utilisateur qui paie ~93 € pour convertir *dans ce but précis* et reçoit la
+même erreur ; il obtient sa capacité trois semaines plus tard, ce qui ressemble
+à de la chance, pas à un effet de la conversion. Oracle ne documente aucune
+priorité par palier. La décision tient donc sur sa propre raison : sur un compte
+non converti, une ressource payante échoue au lieu de facturer, et cette
+garantie est le seul coupe-circuit qui existe — les budgets d'OCI ne font que notifier, ils ne coupent rien. La
 conversion est IRRÉVERSIBLE. Voir `docs/couts.md`.
+
+## Une seule instance A1, jamais deux
+
+La FAQ Always Free est explicite : au-delà du quota A1 d'une tenancy gratuite,
+**toutes** les instances A1 existantes sont désactivées puis supprimées après 30
+jours. Oracle ne réduit pas, il coupe tout. À 2 OCPU / 12 Go on est pile à la
+limite : conforme, mais **jamais une deuxième A1**, même minuscule, même
+temporaire. `oci limits value list --all` affiche des limites bien plus hautes
+(16 OCPU régionaux) parce que le compte est en essai à crédits — rien
+n'empêche techniquement de dépasser, le seul garde-fou est la discipline.
+
+## Le bucket d'état est le point unique de défaillance
+
+`caffelatte-tfstate` contient l'état Terraform et n'est **pas** géré par `tofu`
+(un backend ne peut pas se gérer lui-même). S'il disparaissait, l'état serait
+perdu et toutes les ressources deviendraient orphelines : visibles dans la
+console, invisibles pour `tofu`. Ne pas le supprimer en faisant le ménage.
