@@ -131,3 +131,36 @@ OCI sur une machine exposée, et la loterie de capacité. Le gain est nul.
 **Conséquence sur l'inventaire :** le groupe `edge` devient optionnel. Il reste
 valide si le jeu tourne un jour sur Oracle, mais l'installation par défaut est
 un seul hôte.
+
+## 0009 — La pénurie de mémoire change l'arbitrage (constaté 2026-09-19)
+**Contexte :** le prix au comptant de la DRAM a monté d'environ 700 % sur un an
+(juillet 2026), les fondeurs ayant réaffecté leur capacité vers la HBM pour l'IA.
+Les hébergeurs ont répercuté : Hetzner +30-38 % en avril 2026, la gamme VPS 2026
+d'OVH +40 à 67 %, Netcup et plusieurs autres ont ajusté. TrendForce attend une
+pression soutenue jusqu'en 2028, certaines analyses jusqu'en 2030.
+
+**Ce que ça implique pour ce projet :**
+
+1. *Minecraft est une charge gourmande en RAM, au pire moment.* Le tas Java est
+   la ligne de coût dominante sur un VPS payé aujourd'hui.
+2. *Les 12 Go gratuits d'Oracle sont un actif qui prend de la valeur.* Une
+   allocation figée à 0 $ pendant que le prix de marché de la RAM explose.
+3. *Et ça explique probablement la coupe du 15 juin 2026* (4 OCPU / 24 Go →
+   2 / 12, sans annonce). Donc **il faut s'attendre à ce qu'Oracle recoupe.**
+   La portabilité du dépôt n'est pas de la paranoïa, c'est la réponse au
+   mécanisme qui a déjà frappé une fois.
+4. *La disparition de petits fournisseurs s'accélère* — marges comprimées. Le
+   cas Elixior (site mort en moins d'un an après une offre 8 Go à 6,50 $ CA) est
+   le symptôme, pas une exception. Ne pas prépayer à l'année chez un petit
+   acteur.
+
+**Arbitrage inversé selon l'hôte, à retenir :**
+- **Sur Oracle Always Free** : réserver de la mémoire est *souhaitable*. Le
+  `-Xms4G` sur 12 Go maintient 33 % d'utilisation et empêche la récupération
+  pour inactivité. La RAM ne coûte rien.
+- **Sur un VPS payé** : la mémoire est la ligne la plus chère. Le tas descend à
+  3 Go, FerriteCore et une `simulation-distance` réduite deviennent des
+  décisions budgétaires, pas seulement des réglages de performance.
+
+**Décision :** Oracle en premier, et la règle d'arrêt de trois semaines est
+levée. L'écart de valeur justifie d'attendre plus longtemps.
