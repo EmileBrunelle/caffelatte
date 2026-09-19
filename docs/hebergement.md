@@ -40,26 +40,31 @@ Grafana plus tard.
 Prendre 12 Go parce qu'Oracle en donnait 12 serait s'ancrer sur le mauvais
 chiffre — surtout que le goulot est le CPU monocœur, pas la RAM.
 
-## Ordres de grandeur au Québec (septembre 2026)
+## Prix réels au Québec (vérifiés 2026-09-19)
 
-À vérifier chez le fournisseur : les prix bougent et plusieurs de ces offres
-sont des promotions datées.
+Le 6,50 $ CA pour 8 Go vu sur LowEndBox venait d'Elixior. **Leur site ne répond
+plus** (certificat auto-signé). Ce n'était pas un prix de marché : c'était un
+nouvel entrant qui achetait des clients, et il a disparu en moins d'un an.
+Leçon retenue — ce point de prix n'existe pas de façon durable.
 
-| Offre | Config | Prix |
-|---|---|---|
-| Elixior (Montréal) | 8 Go, 4 vCore, 50 Go NVMe | ~6,50 $ CA/mois |
-| Gnome IT (Montréal) | 6 Go, 2 vCPU | ~8 $/mois |
-| OVHcloud (Beauharnois) | 4 Go, 2 vCPU (Essential) | entrée ~4,35 $/mois |
-| Elixior High CPU | 8 Go, 16 vCPU | ~27,75 $ CA/mois |
+Prix chez un fournisseur établi (ExtraVM, Montréal, en affaires depuis 2014,
+Ryzen 7 + NVMe + protection DDoS, en **dollars US**, facturation mensuelle) :
 
-**Budget réaliste : 8 à 15 $ CA par mois** pour 6-8 Go qui passent les filtres.
+| RAM | Cœurs | Prix/mois US | ≈ $ CA/an |
+|---|---|---|---|
+| 2 Go | 2 | 10 $ | ~165 $ |
+| 4 Go | 2 | 20 $ | ~330 $ |
+| 8 Go | 4 | 40 $ | ~660 $ |
+| 12 Go | 4 | 60 $ | ~990 $ |
 
-Deux prudences avec les offres les moins chères : prendre **au mois**, jamais en
-prépayé annuel chez un fournisseur récent (le taux de disparition est réel dans
-ce segment), et exécuter le test monocœur avant de migrer le monde dessus.
+ServaRica (Montréal, 14 ans, matériel en propre, pas de sursouscription) et
+OVHcloud Beauharnois sont les autres options établies ; OVH est le moins cher
+du lot et le repli réaliste sous contrainte de budget — à vérifier au moment
+d'acheter, et à passer au `sysbench` monocœur avant de s'engager.
 
-Ce que le gratuit d'Oracle vaut vraiment : environ 120 $ par an d'économie, en
-échange de la loterie de capacité et de la politique de récupération.
+**Ce que ça révèle :** les 12 Go d'Oracle valent autour de 990 $ US par année au
+prix d'un VPS de jeu équivalent. Le tier gratuit n'est plus « l'option pas chère
+mais risquée » — c'est la seule qui atteint la cible dans le budget.
 
 ## Ne pas payer 12 mois pour 4 mois de jeu
 

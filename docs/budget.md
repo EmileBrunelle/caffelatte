@@ -19,8 +19,8 @@ réseau ET mémoire tous sous 20 % sur 7 jours) n'est jamais rempli.
 
 Le reste du budget (~175 $) n'est pas dépensé : c'est le **fonds de migration**.
 Si Oracle récupère l'instance ou change ses conditions, le VPS de Montréal est
-en service le jour même avec le même playbook. Une année complète de VPS coûte
-78 $ — le fonds en couvre deux.
+en service le jour même avec le même playbook. Une année de VPS 4 Go coûte
+150-330 $ — le fonds en couvre une, tout juste.
 
 Exploiter le gratuit d'Oracle vaut la peine **précisément parce que le coût de
 sortie est d'une heure**. Sans la portabilité construite dans `ansible/`, ce
@@ -33,18 +33,19 @@ La capacité ARM à Montréal est intermittente. Lancer la boucle de réessai de
 acheter le VPS et ne plus y penser — le temps passé à surveiller une loterie
 dépasse vite les 78 $ qu'elle économise.
 
-## Repli — VPS à l'année, ~100 $ CA
+## Repli — et c'est un compromis, pas un équivalent
 
-| Poste | Fournisseur | Coût annuel |
-|---|---|---|
-| VPS 8 Go, 4 vCore, Montréal | Elixior ou équivalent, ~6,50 $/mois | ~78 $ |
-| Nom de domaine | n'importe quel registraire | ~20 $ |
-| Sauvegarde hors site, ~20 Go | Backblaze B2 (0,006 $ US/Go/mois) | ~2 $ |
-| **Total** | | **~100 $** |
+Plafond de 200 $ CA/an = environ 12 $ US/mois. Chez un fournisseur établi de
+Montréal, ça achète **2 à 3 Go**, pas 8. Un tas Java de 4 Go n'y entre pas.
 
-La variante saisonnière (détruire hors saison, ~55 $/an) est écartée : le
-serveur doit tourner à l'année. Le mécanisme reste utile — c'est lui qui rend
-la migration possible en une heure.
+Le repli réaliste est donc OVHcloud Beauharnois, entrée autour de 4 Go, avec un
+tas réduit à 3 Go, `view-distance` et `simulation-distance` baissés, et aucun
+service supplémentaire à côté du jeu. Ça marche pour 5-10 joueurs en vanilla,
+mais c'est une version diminuée.
+
+Conséquence sur la règle d'arrêt : si Oracle ne donne rien après trois semaines,
+le choix n'est plus « acheter l'équivalent », c'est « accepter moins, ou
+continuer d'attendre ». À décider à ce moment-là, pas maintenant.
 
 ## Ce qu'il ne faut PAS faire avec les 100 $ restants
 
