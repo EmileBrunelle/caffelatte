@@ -47,3 +47,40 @@ seul endroit d'où on peut parler aux joueurs *pendant* l'indisponibilité.
 **Écarté :** `podman-auto-update` seul sur le conteneur Minecraft (il redémarre
 sans prévenir personne), reboot automatique de `dnf-automatic` (même problème,
 en pire).
+
+## 0005 — Services OCI gratuits : oui, mais jamais sur le chemin critique
+**Décidé :** on utilise les services Always Free d'Oracle là où ils résolvent un
+problème qu'on ne peut pas résoudre sur la machine elle-même, et seulement si
+les remplacer prend moins d'une heure.
+
+Retenus :
+- **Object Storage** (~20 Go gratuits, API compatible S3) — *deuxième* dépôt
+  restic. Restauration rapide et gratuite en egress quand le problème est le
+  serveur, pas Oracle.
+- **Email Delivery** — le SMTP sortant depuis une IP de cloud public est bloqué
+  à peu près partout ; Forgejo et le serveur d'authentification ont besoin
+  d'envoyer des courriels. C'est le service qui rapporte le plus pour l'effort.
+- **Bastion** — accès SSH sans port 22 ouvert sur Internet.
+- **Functions + Notifications** — sonde externe de disponibilité. Une machine ne
+  peut pas surveiller sa propre panne ; c'est le seul rôle qui *exige* d'être
+  ailleurs.
+
+Écartés :
+- **Load Balancer** (10 Mbps gratuits) — Caddy sur la VM x86 fait le même travail
+  sans plafond de débit.
+- **Monitoring / Logging OCI** — Grafana + Loki en local, parce que l'observabilité
+  doit survivre au départ d'Oracle et qu'elle fait partie de ce qu'on démontre.
+- **Autonomous Database** — c'est de l'Oracle DB ; les services visés parlent
+  Postgres.
+
+**Contrainte qui tient :** aucun de ces services n'est sur le chemin de connexion
+d'un joueur, et le dépôt restic hors Oracle (ADR 0006) reste la référence.
+
+## 0006 — Sauvegardes : deux dépôts, dont un hors Oracle
+**Décidé :** restic écrit dans deux dépôts — OCI Object Storage (rapide, gratuit)
+et un fournisseur tiers à egress gratuit (Cloudflare R2 ou Backblaze B2).
+**Pourquoi :** une sauvegarde chez le fournisseur qui vient de vous couper ne
+sert à rien. Le coût du second dépôt est de quelques dollars par mois au plus
+pour ce volume — c'est l'assurance contre le scénario qui a motivé le projet.
+**À vérifier :** la restauration, pas la sauvegarde. Un exercice trimestriel,
+noté dans `docs/runbook-restore.md`.

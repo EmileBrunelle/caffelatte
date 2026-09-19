@@ -1,6 +1,5 @@
 #!/bin/bash
 set -euo pipefail
-export RESTIC_REPOSITORY="{{ restic_repo }}"
 export RESTIC_PASSWORD_FILE=/run/secrets/restic_password
 export AWS_ACCESS_KEY_ID="{{ restic_s3_key_id }}"
 export AWS_SECRET_ACCESS_KEY_FILE=/run/secrets/restic_s3_key
@@ -12,8 +11,13 @@ mc() { podman exec minecraft rcon-cli --password "$(cat /run/secrets/rcon_passwo
 trap 'mc save-on || true' EXIT
 mc save-off && mc save-all flush
 
-restic backup /home/svc/.local/share/containers/storage/volumes --tag auto
-restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune
+DATA=/home/svc/.local/share/containers/storage/volumes
 
-# Une sauvegarde non vérifiée n'est pas une sauvegarde.
-restic check --read-data-subset=5%
+# Deux dépôts : OCI Object Storage (rapide, gratuit) et un tiers hors Oracle.
+# Le second existe précisément pour le scénario « Oracle coupe le service ».
+for repo in "{{ restic_repo_oci }}" "{{ restic_repo_offsite }}"; do
+  RESTIC_REPOSITORY="$repo" restic backup "$DATA" --tag auto
+  RESTIC_REPOSITORY="$repo" restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune
+  # Une sauvegarde non vérifiée n'est pas une sauvegarde.
+  RESTIC_REPOSITORY="$repo" restic check --read-data-subset=5%
+done
