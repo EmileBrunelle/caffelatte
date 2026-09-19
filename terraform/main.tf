@@ -350,9 +350,12 @@ resource "oci_core_instance" "veilleuse" {
   source_details {
     source_type = "image"
     source_id   = data.oci_core_images.x86.images[0].id
-    # 47 Go, le défaut. Avec les 50 du volume de démarrage A1 et les 50 du
-    # volume de données, on est à 147 des 200 Go gratuits du tenancy.
-    boot_volume_size_in_gbs = 47
+    # 50 Go, le PLANCHER d'OCI : en deçà, l'API répond 400 « Requested volume
+    # size 47GB is not in the allowed range » (mesuré le 2026-09-19 — le 47 Go
+    # annoncé comme défaut par l'image n'est pas demandable). Avec les 50 du
+    # volume de démarrage A1 et les 50 du volume de données, on est à 150 des
+    # 200 Go gratuits du tenancy.
+    boot_volume_size_in_gbs = 50
   }
 
   create_vnic_details {
