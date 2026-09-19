@@ -1,0 +1,19 @@
+name: ci
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pipx install ansible-lint && ansible-lint ansible/
+      - name: Aucun secret en clair, aucune adresse d'hôte
+        run: |
+          ! grep -rEn '([0-9]{1,3}\.){3}[0-9]{1,3}' ansible/ --include='*.yml' \
+            --exclude='*.example.yml' || { echo "adresse IP dans le dépôt public"; exit 1; }
+
+  image:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - run: podman build -t minecraft containers/minecraft

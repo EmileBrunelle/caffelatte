@@ -1,0 +1,6 @@
+[Unit]
+Description=Sauvegarde restic hors site
+
+[Service]
+Type=oneshot
+ExecStart=/home/svc/bin/backup.sh

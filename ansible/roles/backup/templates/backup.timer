@@ -1,0 +1,10 @@
+[Unit]
+Description=Sauvegarde hors site quotidienne
+
+[Timer]
+OnCalendar=*-*-* 05:30:00
+Persistent=true
+RandomizedDelaySec=900
+
+[Install]
+WantedBy=timers.target

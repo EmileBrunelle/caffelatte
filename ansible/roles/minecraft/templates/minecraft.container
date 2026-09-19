@@ -1,0 +1,24 @@
+[Unit]
+Description=Serveur Minecraft (Fabric)
+After=mc-network.service
+
+[Container]
+Image=ghcr.io/{{ github_org }}/minecraft:{{ minecraft_version }}
+ContainerName=minecraft
+Network=mc.network
+# AUCUN PublishPort : le serveur n'est joignable que par Gate, sur le réseau mc.
+Volume=minecraft-data.volume:/data:Z
+Secret=rcon_password
+Secret=forwarding_secret
+Environment=HEAP={{ minecraft_heap }}
+Environment=ONLINE_MODE=false
+AutoUpdate=registry
+NoNewPrivileges=true
+DropCapability=ALL
+
+[Service]
+Restart=always
+TimeoutStopSec=120
+
+[Install]
+WantedBy=default.target

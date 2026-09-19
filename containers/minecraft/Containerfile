@@ -1,0 +1,50 @@
+# Image Minecraft maison : Fabric + mods serveur-only à parité vanilla.
+# Pas d'image Minecraft tierce — seulement un JRE officiel comme base.
+FROM docker.io/library/eclipse-temurin:21-jdk AS build
+ARG MC_VERSION=1.21.8
+ARG FABRIC_INSTALLER=1.0.3
+# Mods serveur-only : ne changent AUCUN comportement de jeu, seulement la perf.
+ARG MODS="lithium ferrite-core krypton fabricproxy-lite"
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl jq && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+
+RUN curl -fsSL -o installer.jar \
+      "https://maven.fabricmc.net/net/fabricmc/fabric-installer/${FABRIC_INSTALLER}/fabric-installer-${FABRIC_INSTALLER}.jar" \
+ && java -jar installer.jar server -mcversion "${MC_VERSION}" -downloadMinecraft \
+ && rm installer.jar
+
+# Résolution des mods via l'API Modrinth, épinglée à la version de MC.
+RUN mkdir -p mods && for slug in ${MODS}; do \
+      url=$(curl -fsSL "https://api.modrinth.com/v2/project/${slug}/version?loaders=%5B%22fabric%22%5D&game_versions=%5B%22${MC_VERSION}%22%5D" \
+            | jq -re '.[0].files[] | select(.primary) | .url') \
+      && curl -fsSL -o "mods/${slug}.jar" "$url" \
+      || { echo "ÉCHEC: ${slug} n'a pas de build pour ${MC_VERSION}"; exit 1; }; \
+    done
+
+# rcon-cli : c'est lui qui porte les avertissements en jeu avant un redémarrage.
+ARG RCON_CLI=1.7.0
+RUN arch=$(dpkg --print-architecture) \
+ && curl -fsSL "https://github.com/itzg/rcon-cli/releases/download/${RCON_CLI}/rcon-cli_${RCON_CLI}_linux_${arch}.tar.gz" \
+    | tar xz rcon-cli
+
+FROM docker.io/library/eclipse-temurin:21-jre
+LABEL org.opencontainers.image.source="https://github.com/OWNER/caffelatte"
+# Auto-update natif de Podman : `podman auto-update` suit le registre.
+LABEL io.containers.autoupdate=registry
+
+RUN useradd -u 10000 -r -m -d /data minecraft
+COPY --from=build /build/fabric-server-launch.jar /build/libraries /opt/mc/
+COPY --from=build /build/libraries /opt/mc/libraries
+COPY --from=build /build/mods /opt/mc/mods
+COPY --from=build /build/rcon-cli /usr/local/bin/rcon-cli
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+
+USER minecraft
+WORKDIR /data
+VOLUME /data
+EXPOSE 25565 25575
+# Le healthcheck interroge le serveur via RCON : un JVM vivant mais figé est détecté.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=180s \
+  CMD rcon-cli --password "$(cat /run/secrets/rcon_password)" list || exit 1
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

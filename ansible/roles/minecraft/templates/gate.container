@@ -1,0 +1,20 @@
+[Unit]
+Description=Gate — proxy Minecraft (binaire maison, plugin maintenance)
+After=mc-network.service
+
+[Container]
+Image=ghcr.io/{{ github_org }}/gate:latest
+ContainerName=gate
+Network=mc.network
+PublishPort=25565:25565/tcp
+Volume=%h/.config/gate:/etc/gate:ro,Z
+Secret=forwarding_secret
+AutoUpdate=registry
+NoNewPrivileges=true
+DropCapability=ALL
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

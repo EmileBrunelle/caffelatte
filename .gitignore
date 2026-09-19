@@ -1,0 +1,6 @@
+# Inventaire réel : contient IP/FQDN publics. Jamais dans le dépôt public.
+ansible/inventory.yml
+# Clé privée age : jamais commitée (la publique va dans .sops.yaml).
+*.agekey
+keys.txt
+*.retry

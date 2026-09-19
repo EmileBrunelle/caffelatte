@@ -1,0 +1,6 @@
+# Chiffrement par valeur : la structure reste lisible en clair dans Git,
+# seules les valeurs sont chiffrées -> diffs propres, pas de conflit de merge.
+creation_rules:
+  - path_regex: ansible/group_vars/.*/secrets\.ya?ml$
+    encrypted_regex: "^(password|token|key|secret|.*_password|.*_token|.*_key)$"
+    age: "age1REMPLACE_PAR_TA_CLE_PUBLIQUE"

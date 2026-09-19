@@ -1,0 +1,18 @@
+[Unit]
+Description=Geyser standalone — passerelle Bedrock vers Gate
+After=gate.service
+
+[Container]
+Image=ghcr.io/{{ github_org }}/geyser:latest
+ContainerName=geyser
+Network=mc.network
+PublishPort=19132:19132/udp
+Volume=%h/.config/geyser:/opt/geyser/config:Z
+AutoUpdate=registry
+NoNewPrivileges=true
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

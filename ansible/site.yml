@@ -1,0 +1,10 @@
+- hosts: arm
+  become: true
+  roles:
+    - base
+    - minecraft
+
+- hosts: edge
+  become: true
+  roles:
+    - base

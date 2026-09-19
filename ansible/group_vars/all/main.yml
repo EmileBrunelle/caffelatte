@@ -1,0 +1,8 @@
+svc_uid: 1001
+# Pilote systemd --user de l'utilisateur svc depuis une tâche root.
+svc_systemctl: >-
+  runuser -u svc -- env XDG_RUNTIME_DIR=/run/user/{{ svc_uid }} systemctl --user
+
+minecraft_version: "1.21.8"   # bumper ici : l'image se rebuild, les joueurs sont avertis
+minecraft_heap: "4G"          # 12 Go total sur l'ARM depuis la coupe Oracle du 2026-06-15
+maintenance_warn_minutes: [15, 5, 1]

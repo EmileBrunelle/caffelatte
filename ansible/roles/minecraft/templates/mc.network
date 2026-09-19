@@ -1,0 +1,6 @@
+[Unit]
+Description=Réseau interne Minecraft — aucun port backend sur l'hôte
+
+[Network]
+NetworkName=mc
+Internal=false

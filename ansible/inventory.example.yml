@@ -1,0 +1,9 @@
+# cp inventory.example.yml inventory.yml puis remplir. inventory.yml est gitignoré.
+all:
+  children:
+    arm:      # VM.Standard.A1.Flex — tout le lourd
+      hosts:
+        core: { ansible_host: 203.0.113.10, ansible_user: opc }
+    edge:     # VM.Standard.E2.1.Micro x86 — reverse proxy HTTP seulement
+      hosts:
+        edge1: { ansible_host: 203.0.113.11, ansible_user: opc }

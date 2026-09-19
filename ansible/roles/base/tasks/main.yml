@@ -1,0 +1,38 @@
+# Socle commun ARM + x86 : podman rootless, mises à jour auto, pare-feu.
+- name: Paquets de base
+  ansible.builtin.dnf:
+    name: [podman, dnf-automatic, firewalld, policycoreutils-python-utils]
+    state: present
+
+- name: Mises à jour OS automatiques (appliquées, jamais de reboot auto)
+  ansible.builtin.lineinfile:
+    path: /etc/dnf/automatic.conf
+    regexp: "^{{ item.k }} ="
+    line: "{{ item.k }} = {{ item.v }}"
+  loop:
+    - { k: upgrade_type, v: default }
+    - { k: apply_updates, v: "yes" }
+    - { k: reboot, v: never }   # le reboot passe par mc-maintenance.sh (avertissements en jeu)
+
+- name: Timers systèmes
+  ansible.builtin.systemd_service: { name: "{{ item }}", enabled: true, state: started }
+  loop: [dnf-automatic.timer, firewalld]
+
+- name: Utilisateur de service (podman rootless)
+  ansible.builtin.user: { name: svc, system: false, shell: /usr/sbin/nologin }
+
+- name: Linger — les services user démarrent au boot sans session
+  ansible.builtin.command: loginctl enable-linger svc
+  args: { creates: /var/lib/systemd/linger/svc }
+
+- name: Répertoire Quadlet
+  ansible.builtin.file:
+    path: /home/svc/.config/containers/systemd
+    state: directory
+    owner: svc
+    group: svc
+    mode: "0750"
+
+- name: Auto-update des conteneurs (podman, natif)
+  ansible.builtin.command: "{{ svc_systemctl }} enable --now podman-auto-update.timer"
+  changed_when: false
