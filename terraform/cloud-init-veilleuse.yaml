@@ -10,10 +10,13 @@
 # CE QUI N'EST PAS ICI, ET DÉLIBÉRÉMENT : backend.hcl et terraform.tfvars. Le
 # premier contient la Customer Secret Key, qui ouvre le bucket d'état ET celui
 # des sauvegardes. La mettre dans user_data la graverait dans l'état OpenTofu
-# et dans la console OCI. Elle se dépose donc à la main, une fois, par « Run
-# Command » depuis la console — voir docs/runbook-capacite-arm.md. Le service
-# redémarre en boucle tant qu'elle manque, et démarre tout seul dès qu'elle est
-# là.
+# et dans la console OCI.
+#
+# La veilleuse va donc les CHERCHER elle-même dans le bucket, avec son principal
+# d'instance. Rien n'est déposé à la main. La première version passait par
+# « Run Command » depuis la console : mesuré le 2026-09-19, une commande y reste
+# bloquée en ACCEPTED indéfiniment alors que le greffon se déclare RUNNING — le
+# canal n'est donc pas fiable, et il n'y a pas de port 22 pour se rabattre.
 
 package_update: true
 packages:
@@ -70,6 +73,57 @@ write_files:
       Ce courriel part tous les lundis. S'il cesse d'arriver, la veilleuse a
       probablement été récupérée par Oracle pour inactivité : la recréer avec
       un tofu apply."
+
+  - path: /usr/local/sbin/caffelatte-config
+    permissions: "0755"
+    owner: root:root
+    content: |
+      #!/bin/bash
+      # Tire backend.hcl et terraform.tfvars du bucket privé, avec le principal
+      # d'instance. Aucun secret dans user_data, donc rien de gravé dans l'état
+      # OpenTofu ni dans la console OCI — et rien à déposer à la main.
+      set -u
+      mkdir -p /etc/caffelatte
+      for f in backend.hcl terraform.tfvars; do
+        oci os object get --auth instance_principal \
+          --namespace "${namespace}" --bucket-name "${bucket}" \
+          --name "veilleuse/$${f}" --file "/etc/caffelatte/$${f}" || exit 1
+      done
+      chmod 600 /etc/caffelatte/backend.hcl
+
+  - path: /usr/local/sbin/caffelatte-amorcage-rapport
+    permissions: "0755"
+    owner: root:root
+    content: |
+      #!/bin/bash
+      # La machine est aveugle : pas de port 22, et le Run Command reste bloqué
+      # en ACCEPTED. Elle doit donc rendre compte d'elle-même. Ce qui est écrit
+      # ici part aussi dans le journal de console, lisible depuis le portable —
+      # le seul canal qui reste si le CLI manque et que le courriel est
+      # impossible.
+      set -u
+      manque=""
+      command -v oci >/dev/null || manque="$${manque} oci-cli"
+      command -v tofu >/dev/null || manque="$${manque} tofu"
+      [ -f /etc/caffelatte/backend.hcl ] || manque="$${manque} backend.hcl"
+      [ -f /etc/caffelatte/terraform.tfvars ] || manque="$${manque} terraform.tfvars"
+
+      if [ -n "$${manque}" ]; then
+        echo "AMORCAGE INCOMPLET, manque :$${manque}"
+        /usr/local/sbin/caffelatte-notifier \
+          "caffelatte : amorçage de la veilleuse INCOMPLET" \
+          "Il manque :$${manque}
+
+      La veilleuse ne peut pas faire son travail. Voir le journal de console
+      depuis le portable : oci compute console-history capture."
+      else
+        echo "AMORCAGE COMPLET, la veilleuse est en poste"
+        /usr/local/sbin/caffelatte-notifier \
+          "caffelatte : la veilleuse est en poste" \
+          "Amorçage complet. Sonde toutes les 5 minutes, battement le lundi.
+
+      Prochain courriel attendu : le battement hebdomadaire, ou la capacité ARM."
+      fi
 
   - path: /etc/systemd/system/caffelatte-veilleuse.service
     permissions: "0644"
@@ -131,15 +185,33 @@ runcmd:
   - rm -f /tmp/install-opentofu.sh
 
   # Le CLI OCI, pour la sonde de capacité et pour publier les notifications.
-  - dnf install -y oci-cli || pip3 install --quiet oci-cli
+  # PAS `dnf install oci-cli` : le paquet n'existe pas sur Oracle Linux 10 et le
+  # repli pip3 non plus (mesuré le 2026-09-19 dans le journal de console —
+  # « No match for argument: oci-cli », puis « pip3: command not found »). Sans
+  # le CLI la sonde est impossible et la veilleuse est morte-née en silence.
+  # Le script officiel d'Oracle monte son propre venv et ne dépend d'aucun dépôt.
+  - curl -fsSL https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh -o /tmp/install-oci.sh
+  - bash /tmp/install-oci.sh --accept-all-defaults --install-dir /opt/oci-cli --exec-dir /usr/local/bin || (dnf install -y python3-pip && pip3 install --quiet oci-cli)
+  - rm -f /tmp/install-oci.sh
 
   # Le dépôt est public : aucun jeton. Figé au clone — la veilleuse ne se met
   # PAS à jour toute seule, précisément pour qu'un commit sur main ne change
   # jamais ce qu'elle est en train d'appliquer.
   - git clone --depth 1 https://github.com/EmileBrunelle/caffelatte.git /opt/caffelatte
+  # La config privée, tirée du bucket avec le principal d'instance. On réessaie :
+  # l'instance vient d'être créée, et la règle du groupe dynamique qui la vise
+  # met une minute ou deux à se propager dans IAM — sans cette boucle, le tout
+  # premier démarrage échouerait sur une course, pas sur une vraie erreur.
+  - for i in 1 2 3 4 5 6 7 8 9 10; do /usr/local/sbin/caffelatte-config && break || sleep 30; done
   - ln -sf /etc/caffelatte/backend.hcl /opt/caffelatte/terraform/backend.hcl
   - ln -sf /etc/caffelatte/terraform.tfvars /opt/caffelatte/terraform/terraform.tfvars
 
   - systemctl daemon-reload
   - systemctl enable --now caffelatte-battement.timer
   - systemctl enable --now caffelatte-veilleuse.service
+
+  # Il n'y a NI port 22 NI Run Command fiable pour aller voir : la seule façon
+  # de savoir si cet amorçage a marché, c'est qu'il le dise lui-même. Sans ça on
+  # découvre la panne en constatant l'absence de courriel, ce qui ressemble
+  # exactement à une veille qui se passe bien.
+  - /usr/local/sbin/caffelatte-amorcage-rapport

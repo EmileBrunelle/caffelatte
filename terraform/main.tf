@@ -369,6 +369,8 @@ resource "oci_core_instance" "veilleuse" {
     ssh_authorized_keys = var.ssh_public_key
     user_data = base64encode(templatefile("${path.module}/cloud-init-veilleuse.yaml", {
       topic_ocid = oci_ons_notification_topic.alertes.topic_id
+      namespace  = var.os_namespace
+      bucket     = oci_objectstorage_bucket.backup.name
     }))
   }
 
@@ -426,6 +428,15 @@ resource "oci_identity_policy" "veilleuse" {
     "Allow dynamic-group ${oci_identity_dynamic_group.veilleuse.name} to use volume-family in compartment id ${var.compartment_id}",
     "Allow dynamic-group ${oci_identity_dynamic_group.veilleuse.name} to use virtual-network-family in compartment id ${var.compartment_id}",
     "Allow dynamic-group ${oci_identity_dynamic_group.veilleuse.name} to use ons-topics in compartment id ${var.compartment_id}",
+    # Sa config privée, et RIEN d'autre : la condition sur le bucket empêche que
+    # ce droit serve un jour à lire les sauvegardes du monde. En lecture seule.
+    # ponytail: la Customer Secret Key vit désormais dans le bucket qu'elle
+    # protège. Plafond connu : qui obtient la lecture du bucket obtient
+    # l'écriture sur l'état ET les sauvegardes. Assumé parce que les deux autres
+    # canaux sont morts (pas de port 22, Run Command bloqué en ACCEPTED) et que
+    # le dépôt manuel ne tenait qu'à eux. Sortie : OCI Vault Secrets, que le
+    # principal d'instance lit nativement — à faire si le projet grossit.
+    "Allow dynamic-group ${oci_identity_dynamic_group.veilleuse.name} to read objects in compartment id ${var.compartment_id} where target.bucket.name = '${oci_objectstorage_bucket.backup.name}'",
   ]
 }
 

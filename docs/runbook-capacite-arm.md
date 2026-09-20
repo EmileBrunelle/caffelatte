@@ -116,30 +116,44 @@ autre chose. C'est le pendant du refus d'appliquer un arbre non commité, et ça
 lui laisse pas lire. Après le succès, on reprend un `tofu apply` normal depuis
 le portable.
 
-### Les deux fichiers à déposer à la main, une seule fois
+### Sa config, qu'elle va chercher elle-même
 
 `backend.hcl` contient la Customer Secret Key, qui ouvre le bucket d'état **et**
-celui des sauvegardes. Le mettre dans `user_data` la graverait dans l'état
-OpenTofu et dans la console OCI : elle se dépose donc hors bande. Le port 22
-étant fermé, le canal est **Compute → Instance → « Run Command »** dans la
-console (ou Cloud Shell, l'authentification y est déjà déléguée) :
+celui des sauvegardes. La mettre dans `user_data` la graverait dans l'état
+OpenTofu et dans la console OCI. Elle vit donc dans le bucket privé, sous
+`veilleuse/`, et la veilleuse l'y prend au premier démarrage avec son principal
+d'instance — sa policy ne lui donne la lecture que de ce bucket-là.
 
-    sudo mkdir -p /etc/caffelatte
-    sudo tee /etc/caffelatte/backend.hcl >/dev/null <<'EOF'
-    ...contenu local de terraform/backend.hcl...
-    EOF
-    sudo tee /etc/caffelatte/terraform.tfvars >/dev/null <<'EOF'
-    ...contenu local de terraform/terraform.tfvars...
-    EOF
-    sudo chmod 600 /etc/caffelatte/backend.hcl
+Rien à déposer à la main. Pour mettre à jour la config, on repousse l'objet et
+on recrée l'instance :
 
-Rien d'autre à faire : le service redémarre toutes les minutes et **sort en 0
-avec « EN ATTENTE » tant que les fichiers manquent** — l'attente elle-même, pas
-une panne, donc sans alerte. Dès qu'ils sont là, le démarrage suivant fait le
-`tofu init` et la veille commence. Vérifier :
+    oci os object put --namespace "$NS" --bucket-name caffelatte-backup \
+      --name veilleuse/backend.hcl --file terraform/backend.hcl --force
+    oci os object put --namespace "$NS" --bucket-name caffelatte-backup \
+      --name veilleuse/terraform.tfvars --file terraform/terraform.tfvars --force
 
-    sudo systemctl status caffelatte-veilleuse
-    sudo tail -f /var/lib/caffelatte/capacite-arm.log
+**La première version passait par « Run Command » depuis la console. Ne pas y
+revenir :** mesuré le 2026-09-19, une commande y reste bloquée en `ACCEPTED`
+indéfiniment alors que le greffon « Compute Instance Run Command » se déclare
+`RUNNING`. Sans port 22, il ne restait alors aucun canal — la machine était
+inatteignable.
+
+### Savoir si l'amorçage a marché
+
+La veilleuse est aveugle : pas de port 22, pas de Run Command. Elle **rend donc
+compte d'elle-même** en fin de cloud-init, par un courriel « la veilleuse est en
+poste » ou « amorçage INCOMPLET » qui nomme ce qui manque. Si aucun des deux
+n'arrive, le CLI lui-même a échoué et le seul canal restant est le journal de
+console, lisible depuis le portable :
+
+    oci compute console-history capture --instance-id "$I"
+    oci compute console-history get-content --instance-console-history-id "$H" \
+      --length 200000 --file -
+
+C'est ainsi qu'a été trouvée la panne du premier essai : `dnf install oci-cli`
+n'existe pas sur Oracle Linux 10 (« No match for argument: oci-cli ») et le
+repli `pip3` non plus. On passe maintenant par le script d'installation officiel
+d'Oracle, qui ne dépend d'aucun dépôt.
 
 ### Les courriels
 
