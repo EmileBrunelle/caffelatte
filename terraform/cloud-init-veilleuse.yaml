@@ -148,6 +148,13 @@ write_files:
       Restart=always
       RestartSec=60
       WorkingDirectory=/opt/caffelatte
+      # Le fetch de config vit ICI et pas seulement dans le cloud-init. Mesuré
+      # le 2026-09-20 : la propagation IAM du groupe dynamique a dépassé les dix
+      # essais du cloud-init, la machine a abandonné pour de bon et n'avait plus
+      # aucun moyen de se rattraper. Avec le préfixe `-`, un échec n'empêche pas
+      # le démarrage : le script sortira 0 en attente et systemd réessaiera dans
+      # une minute, indéfiniment. L'attente devient auto-réparante.
+      ExecStartPre=-/usr/local/sbin/caffelatte-config
       # Pas de port 22, Run Command mort : le journal de console est le seul
       # oeil qu'on ait sur cette machine, et il ne montrait que l'amorçage. Le
       # 2026-09-20 la boucle n'a jamais sondé sans qu'on puisse voir pourquoi.
