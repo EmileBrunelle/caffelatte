@@ -133,8 +133,18 @@ for fichier in backend.hcl terraform.tfvars; do
 done
 if [ ! -d "$TF/.terraform" ]; then
   journal "Premier démarrage : tofu init."
-  (cd "$TF" && tofu init -no-color -input=false -backend-config=backend.hcl) >>"$JOURNAL" 2>&1 || {
+  # `-lockfile=readonly` n'est pas décoratif : sans lui, `init` réécrit
+  # .terraform.lock.hcl, ce qui salit terraform/ — et le garde-fou d'arbre
+  # propre, dix lignes plus bas, refuse alors de démarrer. La veilleuse se
+  # sabotait avec son propre init, en boucle, sans jamais sonder une seule fois
+  # (mesuré le 2026-09-20 : « ARRÊT AU DÉMARRAGE ... M terraform/.terraform.lock.hcl »).
+  # En lecture seule, un verrou qui ne convient pas échoue FRANCHEMENT au lieu
+  # d'être réécrit en douce : c'est aussi ce qui garde l'épinglage honnête.
+  (cd "$TF" && tofu init -no-color -input=false -lockfile=readonly -backend-config=backend.hcl) >>"$JOURNAL" 2>&1 || {
     journal "ARRÊT : tofu init a échoué."
+    # Sur la veilleuse, le journal vit sur une machine sans port 22 : sans ce
+    # tail, la console dit qu'init a échoué sans jamais dire pourquoi.
+    tail -20 "$JOURNAL"
     exit 2
   }
 fi

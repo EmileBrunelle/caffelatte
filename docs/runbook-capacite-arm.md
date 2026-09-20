@@ -173,6 +173,28 @@ Trois courriels possibles :
   moyen de distinguer « rien à signaler » de « plus personne n'écoute ». **S'il
   cesse d'arriver, la veilleuse est morte** : la recréer par `tofu apply`.
 
+### Recréer la veilleuse : jamais l'instance toute seule
+
+La règle du groupe dynamique épingle **l'OCID exact de l'instance**
+(`matching_rule = ALL {instance.id = '...'}`), délibérément, pour que l'A1
+n'hérite jamais de ces droits. Conséquence : une instance recréée est une
+instance **sans identité** tant que le groupe pointe sur l'ancienne. Toujours
+les deux dans le même apply :
+
+    tofu apply -var profil_oci=CaffeLatteAuto -var auth_oci=ApiKey \
+      -target=oci_core_instance.veilleuse \
+      -target=oci_identity_dynamic_group.veilleuse
+
+Le symptôme, si on l'oublie : `head_object ... status 404` sur
+`veilleuse/backend.hcl` dans le journal de console, alors que l'objet est bien
+dans le bucket. Object Storage répond **404 et non 403** à un principal non
+autorisé — il ne révèle pas l'existence de l'objet. Chercher une faute de nom
+d'objet est donc une fausse piste ; c'est l'IAM. Mesuré le 2026-09-20.
+
+La propagation IAM peut dépasser les dix essais du cloud-init. Ce n'est plus
+fatal depuis que `ExecStartPre=-/usr/local/sbin/caffelatte-config` redemande la
+config à chaque redémarrage du service, soit toutes les minutes.
+
 ### Une fois l'A1 obtenue
 
 Le travail de la veilleuse est fini. La détruire — elle consomme une des deux
