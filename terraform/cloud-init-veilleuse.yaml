@@ -18,6 +18,13 @@
 # bloquée en ACCEPTED indéfiniment alors que le greffon se déclare RUNNING — le
 # canal n'est donc pas fiable, et il n'y a pas de port 22 pour se rabattre.
 
+# 1 Go de RAM et `tofu init` qui déballe le provider OCI (un binaire de
+# plusieurs centaines de Mo) : la veille du 2026-09-20 est restée muette
+# exactement là. Le swap est le module natif de cloud-init, pas un script.
+swap:
+  filename: /swapfile
+  size: 2147483648
+
 package_update: true
 packages:
   - git
@@ -141,6 +148,11 @@ write_files:
       Restart=always
       RestartSec=60
       WorkingDirectory=/opt/caffelatte
+      # Pas de port 22, Run Command mort : le journal de console est le seul
+      # oeil qu'on ait sur cette machine, et il ne montrait que l'amorçage. Le
+      # 2026-09-20 la boucle n'a jamais sondé sans qu'on puisse voir pourquoi.
+      StandardOutput=journal+console
+      StandardError=journal+console
       Environment=OCI_AUTH=instance_principal
       Environment=CAFFELATTE_NOTIFIER=/usr/local/sbin/caffelatte-notifier
       Environment=CAFFELATTE_JOURNAL=/var/lib/caffelatte/capacite-arm.log
