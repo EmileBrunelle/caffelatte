@@ -195,6 +195,30 @@ La propagation IAM peut dépasser les dix essais du cloud-init. Ce n'est plus
 fatal depuis que `ExecStartPre=-/usr/local/sbin/caffelatte-config` redemande la
 config à chaque redémarrage du service, soit toutes les minutes.
 
+### Une veilleuse qui s'amorce bien et ne sonde jamais
+
+Symptôme, mesuré le 2026-09-20 : `AMORCAGE COMPLET` dans le journal de console,
+service démarré, et **zéro `CreateComputeCapacityReport` par le principal
+d'instance** dans le journal d'audit pendant des heures. La commande qui tranche
+— une sonde par un principal AUTRE qu'« Émile Brunelle » veut dire que la
+veilleuse travaille :
+
+    oci audit event list --all --compartment-id "$C" \
+      --start-time <il y a 30 min> --end-time <maintenant> \
+      --query 'data[].{n:data."event-name",p:data.identity."principal-name"}'
+
+Attention à deux choses en lisant ce journal : **il a environ 15 minutes de
+retard**, et sans `--all` il ne rend que la première page. Compter par principal
+ET par cadence : la boucle du portable sonde aux 5 minutes, donc 12 sondes à
+l'heure toutes attribuées à « Émile Brunelle » ne prouvent rien sur la veilleuse.
+
+La cause était que **`tofu init` réécrit `terraform/.terraform.lock.hcl`**, ce
+qui salit `terraform/` — et le garde-fou d'arbre propre, qui s'exécute juste
+après dans le même script, refuse alors de démarrer. Exit 1, redémarrage par
+systemd, même chose, indéfiniment. Corrigé par `-lockfile=readonly` sur l'init.
+Deux mécanismes corrects qui se mordent : à garder en tête avant d'ajouter quoi
+que ce soit d'autre qui écrive dans `terraform/`.
+
 ### Une fois l'A1 obtenue
 
 Le travail de la veilleuse est fini. La détruire — elle consomme une des deux
